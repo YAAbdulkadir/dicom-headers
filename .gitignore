@@ -1,0 +1,47 @@
+# Node
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build output
+dist/
+build/
+out/
+.release/
+coverage/
+*.log
+
+# Electron
+*.asar
+*.asar.unpacked/
+*.map
+app/*.log
+electron/*.log
+*.crash
+*.dmp
+
+# TypeScript
+*.tsbuildinfo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Tests/artifacts
+.playwright/
+test-results/
+
+# Misc
+.env
+.env.*
+
