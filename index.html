@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="theme-color" content="#0b0f14" />
+    <style>
+    /* Tell the browser we're dark-themed (affects scrollbars, form controls, etc.) */
+    :root { color-scheme: dark; }
+
+    /* Ensure the page background is dark edge-to-edge */
+    html, body, #root { height: 100%; width: 100%; background: #0b0f14; margin: 0 }
+
+    /* Chromium / Electron webkit scrollbars */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #0b0f14; }
+    ::-webkit-scrollbar-thumb {
+        background-color: #1f2630;          /* thumb color */
+        border-radius: 8px;
+        border: 2px solid #0b0f14;          /* creates a gap against the track */
+    }
+    ::-webkit-scrollbar-thumb:hover { background-color: #273041; }
+
+    /* (Optional) Firefox inside Electron: keep it thin & dark if used anywhere */
+    * { scrollbar-width: thin; scrollbar-color: #1f2630 #0b0f14; }
+    </style>
+
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Headers</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/renderer/main.tsx"></script>
+  </body>
+</html>
