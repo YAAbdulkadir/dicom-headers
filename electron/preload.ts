@@ -7,6 +7,8 @@ export type SeriesOpenPayload = {
   seriesKey: string
   title: string
   instances: { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }[]
+  tabKey?: string
+  activate?: boolean
 }
 
 export type InstanceRef = { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string };
@@ -85,7 +87,8 @@ export interface RendererApi {
   // Headers window & tabs
   openHeaderWindow: (payload: OpenHeadersPayload) => Promise<boolean>;
   openHeaderSeries: (payload: SeriesOpenPayload) => Promise<boolean>
-  onHeadersAddTab: (cb: (payload: { instances: InstanceRef[]; title?: string }) => void) => void;
+  onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => () => void
+  pingHeaders?: () => Promise<void>
 }
 
 /* ----------------------------- Implementation --------------------------- */
@@ -121,15 +124,18 @@ const api = {
 
   // Headers window & tabs
   openHeaderWindow: (payload: string | AddTabPayload) => ipcRenderer.invoke('headers:openWindow', payload),
-  openHeaderSeries: (payload: any) => ipcRenderer.invoke('headers:openSeries', payload),
-  onHeadersAddTab: (cb: (payload: AddTabPayload) => void) => {
-    const handler = (_e: IpcRendererEvent, payload: AddTabPayload) => cb(payload)
+  openHeaderSeries: (payload: SeriesOpenPayload) => ipcRenderer.invoke('headers:openSeries', payload),
+
+  onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => {
+    const handler = (_e: IpcRendererEvent, payload: SeriesOpenPayload) => cb(payload)
     ipcRenderer.on('headers:add-tab', handler)
     return () => ipcRenderer.off('headers:add-tab', handler)
   },
 
   // small handshake to force a flush if needed
   pingHeaders: () => ipcRenderer.invoke('headers:ping'),
+
+
 } as const
 
 contextBridge.exposeInMainWorld('api', api)
