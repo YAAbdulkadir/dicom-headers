@@ -51,6 +51,8 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "dicom-parser": "^1.8.21",
+    "dicom-data-dictionary": "^0.3.1"
   }
 }
