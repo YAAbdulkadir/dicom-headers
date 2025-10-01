@@ -12,7 +12,7 @@ yarn.lock
 dist/
 build/
 out/
-.release/
+release/*
 coverage/
 *.log
 
