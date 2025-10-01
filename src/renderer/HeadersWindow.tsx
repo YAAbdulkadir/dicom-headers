@@ -2,7 +2,7 @@
 import React from 'react'
 import { HeaderNode, HeaderTree } from './components/Headers'
 
-console.log('[headers] module loaded')
+// console.log('[headers] module loaded')
 
 /** Instance reference passed from main */
 type InstanceRef = { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }
