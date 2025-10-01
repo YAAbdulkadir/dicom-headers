@@ -121,7 +121,7 @@ const api = {
 
   // Headers window & tabs
   openHeaderWindow: (payload: string | AddTabPayload) => ipcRenderer.invoke('headers:openWindow', payload),
-  openHeaderSeries: (payload) => ipcRenderer.invoke('headers:openSeries', payload),
+  openHeaderSeries: (payload: any) => ipcRenderer.invoke('headers:openSeries', payload),
   onHeadersAddTab: (cb: (payload: AddTabPayload) => void) => {
     const handler = (_e: IpcRendererEvent, payload: AddTabPayload) => cb(payload)
     ipcRenderer.on('headers:add-tab', handler)
