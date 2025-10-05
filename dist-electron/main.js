@@ -1,15 +1,17 @@
 "use strict";
+// import * as dotenv from 'dotenv'
+// dotenv.config()
 Object.defineProperty(exports, "__esModule", { value: true });
-const dotenv = require("dotenv");
-dotenv.config();
 const electron_1 = require("electron");
 const path = require("node:path");
 const node_worker_threads_1 = require("node:worker_threads");
+if (!electron_1.app.isPackaged) {
+    require('dotenv').config();
+}
 let mainWindow = null;
 let headersWindow = null;
 let headersWindowLoaded = false;
 let headersRendererReady = false;
-let headersReady = false;
 function iconPath() {
     return electron_1.app.isPackaged
         ? path.join(process.resourcesPath, 'icons', 'icon-256.png')
@@ -22,19 +24,24 @@ function sendAddTab(p) {
         return;
     // headersWindow.webContents.send('headers:add-tab', payload)
     headersWindow.webContents.send('headers:add-tab', p);
-    headersWindow.show();
-    headersWindow.focus();
+    // headersWindow.show()
+    // headersWindow.focus()
 }
 function flushIfFullyReady() {
+    // console.log('[main] flushIfFullyReady', {
+    //   headersWindowLoaded,
+    //   headersRendererReady,
+    //   queued: headersQueue.length
+    // })
     if (!headersWindow || headersWindow.isDestroyed())
         return;
     if (!headersWindowLoaded || !headersRendererReady)
         return;
     const q = headersQueue.splice(0, headersQueue.length);
-    for (const p of q)
-        sendAddTab(p);
+    q.forEach(sendAddTab);
+    // console.log('[main] flush?', { headersWindowLoaded, headersRendererReady, queued: headersQueue.length })
 }
-function createWindow() {
+async function createWindow() {
     // console.log('[main] createWindow() DEV_URL=', DEV_URL)
     mainWindow = new electron_1.BrowserWindow({
         icon: process.platform === 'linux' ? iconPath() : undefined,
@@ -55,12 +62,14 @@ function createWindow() {
     const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL;
     if (isDev) {
         // console.log('[main] loading main window URL:', DEV_URL)
-        mainWindow.loadURL(DEV_URL);
+        await mainWindow.loadURL(DEV_URL);
+        // mainWindow.loadURL(DEV_URL)
     }
     else {
-        const file = path.join(process.cwd(), 'dist', 'index.html');
+        await mainWindow.loadFile(path.join(electron_1.app.getAppPath(), 'dist', 'index.html'));
+        // const file = path.join(process.cwd(), 'dist', 'index.html')
         // console.log('[main] loading main window file:', file)
-        mainWindow.loadFile(path.join(process.cwd(), 'dist', 'index.html'));
+        // mainWindow.loadFile(path.join(process.cwd(), 'dist', 'index.html'))
     }
     mainWindow.webContents.on('did-finish-load', () => {
         // console.log('[main] mainWindow did-finish-load url=', mainWindow?.webContents.getURL())
@@ -75,10 +84,10 @@ function createWindow() {
         mainWindow = null;
     });
 }
-function ensureHeadersWindow() {
+async function ensureHeadersWindow() {
     if (headersWindow && !headersWindow.isDestroyed())
         return headersWindow;
-    headersReady = false;
+    // headersReady = false
     // headersQueue = []
     headersWindowLoaded = false;
     headersRendererReady = false;
@@ -99,23 +108,30 @@ function ensureHeadersWindow() {
             nodeIntegration: false,
         },
     });
+    // (Optional) keep this to log if it happens later for any reason
+    headersWindow.webContents.on('did-finish-load', () => {
+        // console.log('[main] headersWindow did-finish-load (event)')
+        headersWindowLoaded = true;
+        flushIfFullyReady();
+    });
     const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL;
     if (isDev) {
         const url = `${DEV_URL.replace(/\/?$/, '/')}#/headers`;
         // console.log('[main] headersWindow.loadURL', url)
-        headersWindow.loadURL(url);
+        // headersWindow.loadURL(url)
+        await headersWindow.loadURL(url);
     }
     else {
-        const file = path.join(process.cwd(), 'dist', 'index.html');
+        // const file = path.join(process.cwd(), 'dist', 'index.html')
+        const file = path.join(electron_1.app.getAppPath(), 'dist', 'index.html');
+        // console.log('[main] headersWindow.loadFile', file, '#/headers')
+        await headersWindow.loadFile(file, { hash: '/headers' });
         // console.log('[main] headersWindow.loadFile', file, 'with hash=/headers')
-        headersWindow.loadFile(file, { hash: '/headers' });
+        // headersWindow.loadFile(file, { hash: '/headers' })
     }
-    headersWindow.webContents.on('did-finish-load', () => {
-        // console.log('[main] headersWindow did-finish-load url=', headersWindow?.webContents.getURL())
-        // auto-open DevTools to see renderer logs immediately
-        // headersWindow!.webContents.openDevTools({ mode: 'detach' })
-        headersWindowLoaded = true;
-    });
+    headersWindowLoaded = true;
+    // console.log('[main] headersWindow load completed -> mark loaded = true')
+    flushIfFullyReady();
     headersWindow.once('ready-to-show', () => {
         // console.log('[main] headersWindow ready-to-show')
         headersWindow.maximize();
@@ -125,7 +141,8 @@ function ensureHeadersWindow() {
     headersWindow.on('closed', () => {
         // console.log('[main] headersWindow closed')
         headersWindow = null;
-        headersReady = false;
+        headersWindowLoaded = false;
+        headersRendererReady = false;
     });
     return headersWindow;
 }
@@ -221,18 +238,23 @@ electron_1.ipcMain.handle('headers:get', async (_evt, filePath, options) => {
     });
 });
 electron_1.ipcMain.handle('headers:openSeries', async (_evt, payload) => {
-    const win = ensureHeadersWindow();
+    // console.log('[main] headers:openSeries received', {
+    //   seriesKey: payload?.seriesKey,
+    //   instCount: payload?.instances?.length ?? 0
+    // })
+    const win = await ensureHeadersWindow();
     // queue it (renderer will focus if already open)
-    headersQueue.push(payload);
-    flushIfFullyReady();
-    // Use a stable key (e.g., first instance path) to deduplicate
     const firstPath = payload.instances?.[0]?.path;
     const tabKey = firstPath || (payload.title ?? `series_${Date.now()}`);
-    win.webContents.send('headers:add-tab', { ...payload, tabKey });
+    headersQueue.push({ ...payload, tabKey, activate: true });
+    flushIfFullyReady();
+    win.show();
+    win.focus();
     return true;
 });
 // Handle "ping" from renderer to flush late
 electron_1.ipcMain.handle('headers:ping', () => {
+    // console.log('[main] headers:ping')
     headersRendererReady = true;
     flushIfFullyReady();
     return true;
