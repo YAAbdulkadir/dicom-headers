@@ -516,47 +516,33 @@ function tagHexFromString(tag: string) {
 }
 
 function elementPreview(ds: any, tag: string, el: any, vr: string | null): string {
+  const VR = (vr || el?.vr || '').toUpperCase();
+
   // Sequences: show item count
-  if (vr === 'SQ' || el.vr === 'SQ' || el.items) {
-    const n = (el.items?.length ?? 0);
+  if (VR === 'SQ' || el?.items) {
+    const n = el?.items?.length ?? 0;
     return `Items: ${n}`;
   }
 
-  // Binary-ish payloads: don't dump bytes
-  if (isBinaryVR(vr)) {
-    return ''; // your UI shows "[binary]" and you already display Length
-  }
+  // Binary-ish payloads: don't dump bytes (your UI shows "[binary]" and you display Length)
+  if (isBinaryVR(VR)) return '';
 
-  // Numeric VRs
-  if (vr && /^(US|SS|UL|SL|FL|FD)$/i.test(vr)) {
-    const vals = readNumericValues(ds, tag, el, vr);
+  // Fixed-width numeric VRs — read from bytes (this is what makes Rows/Columns/Bits* correct)
+  if (/^(US|SS|UL|SL|FL|FD)$/i.test(VR)) {
+    const vals = readNumericValues(ds, tag, el, VR);
     return vals.length ? vals.join('\\') : '';
   }
 
-  // Numeric as strings (IS/DS): keep textual form with backslashes if VM>1
-  if (vr && /^(IS|DS)$/i.test(vr)) {
-    try {
-      const s = ds.string(tag) || '';
-      return s.length > 120 ? (s.slice(0, 117) + '…') : s;
-    } catch { return ''; }
-  }
-
-  // Text VRs (LO/SH/CS/PN/UI/etc.): use string()
-  if (isStringVR(vr)) {
-    try {
-      const s = ds.string(tag) || '';
-      return s.length > 120 ? (s.slice(0, 117) + '…') : s;
-    } catch { return ''; }
-  }
-
-  // Fallback
+  // Numeric-as-string (IS/DS) and all text VRs: return FULL string (no truncation)
   try {
     const s = ds.string(tag);
-    if (s && s.length > 0) {
-      return s.length > 120 ? (s.slice(0, 117) + '…') : s;
-    }
-  } catch {}
-  const length = typeof el.length === 'number' ? el.length : 0;
+    if (s != null) return s;   // keep all backslash-separated components
+  } catch {
+    // ignore and fall through
+  }
+
+  // Fallback: if there are bytes, show a hint; otherwise blank
+  const length = typeof el?.length === 'number' ? el.length : 0;
   return length > 0 ? `<${length} bytes>` : '';
 }
 

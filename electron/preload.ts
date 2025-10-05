@@ -1,23 +1,22 @@
-
 // electron/preload.ts
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 /* ----------------------------- Shared types ----------------------------- */
+export type InstanceRef = {
+  path: string
+  sop?: string
+  instanceNumber?: number
+  date?: string
+  time?: string
+}
+
 export type SeriesOpenPayload = {
   seriesKey: string
   title: string
-  instances: { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }[]
+  instances: InstanceRef[]
   tabKey?: string
   activate?: boolean
 }
-
-export type InstanceRef = { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string };
-export type OpenHeadersPayload =
-  | string                                  // backward compatible (single file path)
-  | { instances: InstanceRef[]; title?: string };
-export type AddTabPayload =
-  | { filePath: string }
-  | { instances: InstanceRef[]; title?: string }
 
 export type ScanOptions = {
   ignorePrivate: boolean
@@ -28,14 +27,15 @@ export type ScanOptions = {
 export type ScanProgressMessage = {
   type: 'progress'
   jobId: string
-  processed: number
-  total: number
+  processed?: number
+  total?: number
+  percent?: number
 }
 
 export type ScanResultMessage = {
   type: 'result'
   jobId: string
-  index: unknown // your final aggregated index type if you have one
+  index: unknown
 }
 
 export type ScanErrorMessage = {
@@ -44,7 +44,6 @@ export type ScanErrorMessage = {
   error: string
 }
 
-/** Header node shape coming from the worker (match your worker’s HeaderNode) */
 export type HeaderNode = {
   tagHex: string
   keyword: string
@@ -56,40 +55,49 @@ export type HeaderNode = {
   children?: HeaderNode[]
 }
 
-/** Options for headers:get (you can reuse ScanOptions) */
 export type HeadersGetOptions = ScanOptions
 
-/** Payload sent to the headers window to add a new tab */
-export type HeadersAddTabPayload = {
-  filePath: string
-}
+export type ChosenPath =
+  | { path: string; kind: 'file' }
+  | { path: string; kind: 'directory' }
 
 /* ------------------------------ API contract ---------------------------- */
 export interface RendererApi {
-  // Window controls
+  // Window
   winMinimize: () => Promise<void>
   winMaximize: () => Promise<void>
   winClose: () => Promise<void>
-  winFullScreenToggle?: () => Promise<void> // if you exposed it in main
+  winFullScreenToggle?: () => Promise<void>
 
-  // Dialogs
-  chooseDir: () => Promise<string | null>
+  // Dialogs (explicit)
+  chooseFile: () => Promise<ChosenPath | null>
+  chooseDir: () => Promise<ChosenPath | null>
 
   // Scanning
-  startScan: (root: string, options: ScanOptions) => Promise<string> // returns jobId
-  onScanProgress: (cb: (msg: ScanProgressMessage) => void) => void
-  onScanResult: (cb: (msg: ScanResultMessage) => void) => void
-  onScanError: (cb: (msg: ScanErrorMessage) => void) => void
+  startScan: (root: string, options: ScanOptions) => Promise<string>
+  onScanProgress: (cb: (msg: ScanProgressMessage) => void) => () => void
+  onScanResult: (cb: (msg: ScanResultMessage) => void) => () => void
+  onScanError: (cb: (msg: ScanErrorMessage) => void) => () => void
 
-  // Headers (single file)
+  // Headers
   getHeaders: (path: string, options: HeadersGetOptions) => Promise<HeaderNode[]>
 
   // Headers window & tabs
-  openHeaderWindow: (payload: OpenHeadersPayload) => Promise<boolean>;
   openHeaderSeries: (payload: SeriesOpenPayload) => Promise<boolean>
   onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => () => void
+  openSingleFile: (filePath: string) => Promise<boolean>
+
+  copyText: (text: string) => Promise<boolean>
   pingHeaders?: () => Promise<void>
 }
+
+const headersEventBuffer: any[] = []
+let headersListener: ((p: any)=>void) | null = null
+
+ipcRenderer.on('headers:add-tab', (_e, payload) => {
+  if (headersListener) headersListener(payload)
+  else headersEventBuffer.push(payload)
+})
 
 /* ----------------------------- Implementation --------------------------- */
 const api = {
@@ -99,50 +107,76 @@ const api = {
   winClose: () => ipcRenderer.invoke('win:close'),
   winFullScreenToggle: () => ipcRenderer.invoke('win:fullscreenToggle'),
 
-  // Dialogs
-  chooseDir: () => ipcRenderer.invoke('dialog:chooseDir'),
+  // Dialogs (explicit)
+  chooseFile: () => ipcRenderer.invoke('dialog:chooseFile') as Promise<ChosenPath | null>,
+  chooseDir: () => ipcRenderer.invoke('dialog:chooseDir') as Promise<ChosenPath | null>,
 
   // Scanning
   startScan: (root: string, options: ScanOptions) =>
     ipcRenderer.invoke('scan:start', root, options),
 
   onScanProgress: (cb: (msg: ScanProgressMessage) => void) => {
-    ipcRenderer.on('scan:progress', (_e: IpcRendererEvent, msg: ScanProgressMessage) => cb(msg))
+    const h = (_e: IpcRendererEvent, msg: ScanProgressMessage) => cb(msg)
+    ipcRenderer.on('scan:progress', h)
+    return () => ipcRenderer.off('scan:progress', h)
   },
 
   onScanResult: (cb: (msg: ScanResultMessage) => void) => {
-    ipcRenderer.on('scan:result', (_e: IpcRendererEvent, msg: ScanResultMessage) => cb(msg))
+    const h = (_e: IpcRendererEvent, msg: ScanResultMessage) => cb(msg)
+    ipcRenderer.on('scan:result', h)
+    return () => ipcRenderer.off('scan:result', h)
   },
 
   onScanError: (cb: (msg: ScanErrorMessage) => void) => {
-    ipcRenderer.on('scan:error', (_e: IpcRendererEvent, msg: ScanErrorMessage) => cb(msg))
+    const h = (_e: IpcRendererEvent, msg: ScanErrorMessage) => cb(msg)
+    ipcRenderer.on('scan:error', h)
+    return () => ipcRenderer.off('scan:error', h)
   },
 
   // Headers
   getHeaders: (path: string, options: HeadersGetOptions) =>
     ipcRenderer.invoke('headers:get', path, options),
 
-  // Headers window & tabs
-  openHeaderWindow: (payload: string | AddTabPayload) => ipcRenderer.invoke('headers:openWindow', payload),
-  openHeaderSeries: (payload: SeriesOpenPayload) => ipcRenderer.invoke('headers:openSeries', payload),
+  openHeaderSeries: (payload: SeriesOpenPayload) =>
+    ipcRenderer.invoke('headers:openSeries', payload),
 
   onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => {
-    const handler = (_e: IpcRendererEvent, payload: SeriesOpenPayload) => cb(payload)
-    ipcRenderer.on('headers:add-tab', handler)
-    return () => ipcRenderer.off('headers:add-tab', handler)
+    headersListener = cb
+    // flush buffered events
+    while (headersEventBuffer.length) cb(headersEventBuffer.shift())
+      return () => { headersListener = null }
   },
 
-  // small handshake to force a flush if needed
+  openSingleFile: (filePath: string) => ipcRenderer.invoke('headers:openSingleFile', filePath),
+  //   const h = (_e: IpcRendererEvent, payload: SeriesOpenPayload) => cb(payload)
+  //   ipcRenderer.on('headers:add-tab', h)
+  //   return () => ipcRenderer.off('headers:add-tab', h)
+  // },
+
   pingHeaders: () => ipcRenderer.invoke('headers:ping'),
 
-
+  copyText: async (text: string) => {
+    try {
+      // Prefer Electron main-process clipboard (works everywhere)
+      await ipcRenderer.invoke('util:copyText', String(text ?? ''))
+      return true
+    } catch {
+      // Fallback: try navigator.clipboard for good measure
+      try {
+        await navigator.clipboard.writeText(String(text ?? ''))
+        return true
+      } catch {
+        return false
+      }
+    }
+  },
 } as const
 
 contextBridge.exposeInMainWorld('api', api)
 
-// Optional: declare Window.api globally for TS in renderer
+// Optional: make TS happy in renderer
 declare global {
   interface Window {
-    api: typeof api //RendererApi
+    api: typeof api
   }
 }

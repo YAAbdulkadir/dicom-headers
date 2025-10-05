@@ -20,14 +20,31 @@ declare global {
       winMaximize: () => Promise<void>
       winClose: () => Promise<void>
       pingHeaders?: () => Promise<void>
+      copyText?: (text: string) => Promise<boolean>   // <-- used by CopyCell
     }
   }
 }
 
-const mono: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }
+const mono: React.CSSProperties = {
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+}
 
-function WinBtn({ label, title, onClick, danger = false }:
-  { label: string; title?: string; onClick: () => void; danger?: boolean }) {
+/* ---------------------- Small utilities ---------------------- */
+function fmtDate(d?: string | null) {
+  return d && d.length >= 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : (d ?? '—')
+}
+function fmtTime(t?: string | null) {
+  if (!t) return '—'
+  const hh = t.slice(0,2) || '', mm = t.slice(2,4) || '', ss = t.slice(4,6) || ''
+  const frac = t.length > 6 ? t.slice(6) : ''
+  const core = [hh, mm, ss].filter(Boolean).join(':')
+  return core + frac
+}
+
+/* ---------------------- Window controls ---------------------- */
+function WinBtn({
+  label, title, onClick, danger = false
+}: { label: string; title?: string; onClick: () => void; danger?: boolean }) {
   return (
     <button
       title={title}
@@ -68,6 +85,7 @@ function TitleBar() {
   )
 }
 
+/* ---------------------- Tabs state ---------------------- */
 type Tab = {
   id: string
   seriesKey: string
@@ -129,18 +147,16 @@ function useTabManager() {
       })
     })
 
-    window.api.pingHeaders?.()           // tell main we’re ready so it flushes the queue
+    window.api.pingHeaders?.() // flush queue from main
     return () => { off && off() }
   }, [loadInstance])
 
-  // keep a valid activeId
   React.useEffect(() => {
     if (!activeId && tabs[0]) setActiveId(tabs[0].id)
   }, [tabs, activeId])
 
   const active = tabs.find(t => t.id === activeId)
 
-  // ensure the (newly) active tab has its first/current instance loaded
   React.useEffect(() => {
     if (!active) return
     if (active.instances.length === 0) return
@@ -162,6 +178,152 @@ function useTabManager() {
   return { tabs, setTabs, activeId, setActiveId, closeTab, loadInstance }
 }
 
+/* ---------------------- Tab button ---------------------- */
+function TabButton({
+  active,
+  title,
+  onClick,
+  onClose,
+}: {
+  active: boolean;
+  title: string;
+  onClick: () => void;
+  onClose: () => void;
+}) {
+  const [hover, setHover] = React.useState(false)
+
+  const base: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 12px',
+    height: 32,
+    borderRadius: '8px 8px 0 0',
+    cursor: 'pointer',
+    userSelect: 'none',
+    transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
+    maxWidth: 320,
+    marginBottom: -1,
+    position: 'relative',
+  }
+
+  const activeStyle: React.CSSProperties = {
+    background: '#0b0f14',
+    borderTop: '1px solid #1f2630',
+    borderLeft: '1px solid #1f2630',
+    borderRight: '1px solid #1f2630',
+    borderBottom: '0',
+    color: '#e6edf3',
+    zIndex: 2,
+    boxShadow: '0 1px 0 0 #0b0f14 inset',
+  }
+
+  const inactiveBorder = hover ? '#1b2330' : '#141a22'
+  const inactiveStyle: React.CSSProperties = {
+    background: hover ? '#141c27' : '#0e1420',
+    border: `1px solid ${inactiveBorder}`,
+    color: '#c6ced8',
+    zIndex: 1,
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ ...base, ...(active ? activeStyle : inactiveStyle) }}
+      title={title}
+    >
+      <span
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          paddingRight: 2,
+        }}
+      >
+        {title}
+      </span>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        aria-label="Close tab"
+        title="Close"
+        style={{
+          width: 18,
+          height: 18,
+          lineHeight: '14px',
+          borderRadius: 4,
+          border: `1px solid ${inactiveBorder}`,
+          background: active ? '#101826' : hover ? '#0b0f14' : 'transparent',
+          color: '#e6edf3',
+          cursor: 'pointer',
+          opacity: active ? 1 : hover ? 1 : 0,
+          transition: 'opacity 120ms ease, background 120ms ease, border-color 120ms ease',
+        }}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+/* ---------------------- Copyable cell for Instances table ---------------------- */
+function CopyCell({
+  text,
+  children,
+  title,
+  style,
+}: {
+  text: string
+  children?: React.ReactNode
+  title?: string
+  style?: React.CSSProperties
+}) {
+  const [copied, setCopied] = React.useState(false)
+
+  async function onCopy(e: React.MouseEvent) {
+    // Let the row's onClick (select) still happen, but also copy
+    await window.api.copyText?.(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 900)
+    e.stopPropagation()
+  }
+
+  return (
+    <div
+      onClick={onCopy}
+      title={title || 'Click to copy'}
+      style={{
+        position: 'relative',
+        cursor: 'copy',
+        ...style,
+      }}
+    >
+      <div style={{ pointerEvents: 'none' }}>{children ?? text}</div>
+      {copied && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: 4,
+            fontSize: 10,
+            padding: '2px 6px',
+            border: '1px solid #2a3442',
+            background: '#101826',
+            color: '#b8c2d1',
+            borderRadius: 6,
+            pointerEvents: 'none',
+          }}
+        >
+          Copied!
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------------------- Main component ---------------------- */
 export default function HeadersWindow() {
   const { tabs, setTabs, activeId, setActiveId, closeTab, loadInstance } = useTabManager()
   const active = tabs.find(t => t.id === activeId) || tabs[0]
@@ -177,60 +339,99 @@ export default function HeadersWindow() {
     }
   }
 
-  const fmtDate = (d?: string | null) =>
-    (d && d.length >= 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : (d ?? '—'))
-  const fmtTime = (t?: string | null) => {
-    if (!t) return '—'
-    const hh = t.slice(0,2) || '', mm = t.slice(2,4) || '', ss = t.slice(4,6) || ''
-    const frac = t.length > 6 ? t.slice(6) : ''
-    const core = [hh, mm, ss].filter(Boolean).join(':')
-    return core + frac
-  }
-
   const nodes: HeaderNode[] | undefined =
     active && active.cache[active.activeIdx] ? active.cache[active.activeIdx] : undefined
 
   const th = { padding: '6px 8px', color: '#a7b0be', textAlign: 'center' }
-  const cellMono: React.CSSProperties = { ...mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }
+  const cellMono: React.CSSProperties = {
+    ...mono,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    textAlign: 'center'
+  }
 
   return (
-    <div style={{ fontFamily: 'ui-sans-serif, system-ui', color: '#e6edf3', background: '#0b0f14',
-                  height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+    <div
+      style={{
+        fontFamily: 'ui-sans-serif, system-ui',
+        color: '#e6edf3',
+        background: '#0b0f14',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        minHeight: 0
+      }}
+    >
       <TitleBar />
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, padding: 8, borderBottom: '1px solid #1f2630',
-                    background: '#0b0f14', flexShrink: 0, minWidth: 0, minHeight: 0 }}>
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 6,
+          padding: '0 8px',
+          paddingTop: 8,
+          background: '#0b0f14',
+          borderBottom: '0',
+          flexShrink: 0,
+          minWidth: 0,
+        }}
+      >
+        {/* underline behind all tabs */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 1,
+            background: '#141a22',
+            zIndex: 0,
+          }}
+        />
         {tabs.map((t) => (
-          <div key={t.id}
-               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                        borderRadius: 8, border: '1px solid #1f2630',
-                        background: t.id === active?.id ? '#121822' : '#0e1420', cursor: 'pointer' }}
-               onClick={() => setActiveId(t.id)} title={t.title}>
-            <span style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {t.title}
-            </span>
-            <button onClick={(e) => { e.stopPropagation(); closeTab(t.id) }}
-                    style={{ width: 18, height: 18, borderRadius: 4, border: '1px solid #1f2630',
-                             background: '#0b0f14', color: '#e6edf3', cursor: 'pointer', lineHeight: '14px' }}>
-              ×
-            </button>
-          </div>
+          <TabButton
+            key={t.id}
+            active={t.id === active?.id}
+            title={t.title}
+            onClick={() => setActiveId(t.id)}
+            onClose={() => closeTab(t.id)}
+          />
         ))}
-        <div style={{ marginLeft: 'auto', color: '#a7b0be', fontSize: 12 }}>
+        <div style={{ marginLeft: 'auto', color: '#a7b0be', fontSize: 12, paddingBottom: 6 }}>
           {tabs.length ? `${tabs.length} tab${tabs.length > 1 ? 's' : ''}` : 'Open a header from the main window'}
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12,
-                    minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          padding: 12,
+          minHeight: 0,
+          minWidth: 0,
+          overflow: 'hidden',
+          borderTop: '1px solid #1f2630'
+        }}
+      >
         {active ? (
           <>
             {/* Instances */}
             <div style={{ border: '1px solid #1f2630', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                            padding: '6px 8px', borderBottom: '1px solid #1f2630' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
+                  padding: '6px 8px',
+                  borderBottom: '1px solid #1f2630'
+                }}
+              >
                 <div style={th}>#</div>
                 <div style={th}>SOPInstanceUID</div>
                 <div style={th}>Instance</div>
@@ -241,17 +442,47 @@ export default function HeadersWindow() {
               <div style={{ maxHeight: 160, overflow: 'auto' }}>
                 {active.instances.map((inst: any, i: number) => {
                   const selected = i === active.activeIdx
+
+                  const sop = inst.sop || '—'
+                  const instanceStr = inst.instanceNumber ?? '—'
+                  const dateStr = fmtDate(inst.date)
+                  const timeStr = fmtTime(inst.time)
+                  const pathStr = inst.path
+
                   return (
-                    <div key={i} onClick={() => selectInstance(i)} title={inst.path}
-                         style={{ display: 'grid', gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                                  padding: '6px 8px', borderBottom: '1px solid #1f2630',
-                                  background: selected ? '#121822' : 'transparent', cursor: 'pointer' }}>
-                      <div style={cellMono}>{i + 1}</div>
-                      <div style={cellMono}>{inst.sop || '—'}</div>
-                      <div style={cellMono}>{inst.instanceNumber ?? '—'}</div>
-                      <div style={cellMono}>{fmtDate(inst.date)}</div>
-                      <div style={cellMono}>{fmtTime(inst.time)}</div>
-                      <div style={cellMono}>{inst.path}</div>
+                    <div
+                      key={i}
+                      onClick={() => selectInstance(i)}
+                      title={inst.path}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
+                        padding: '6px 8px',
+                        borderBottom: '1px solid #1f2630',
+                        background: selected
+                          ? '#121822'
+                          : (i % 2 === 0 ? 'transparent' : '#0e1420'), // zebra stripe
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <CopyCell text={String(i + 1)} style={cellMono} title="Copy row #">
+                        {i + 1}
+                      </CopyCell>
+                      <CopyCell text={sop} style={cellMono} title="Copy SOPInstanceUID">
+                        {sop}
+                      </CopyCell>
+                      <CopyCell text={String(instanceStr)} style={cellMono} title="Copy Instance Number">
+                        {instanceStr}
+                      </CopyCell>
+                      <CopyCell text={dateStr} style={cellMono} title="Copy Date">
+                        {dateStr}
+                      </CopyCell>
+                      <CopyCell text={timeStr} style={cellMono} title="Copy Time">
+                        {timeStr}
+                      </CopyCell>
+                      <CopyCell text={pathStr} style={cellMono} title="Copy full path">
+                        {pathStr}
+                      </CopyCell>
                     </div>
                   )
                 })}
@@ -282,3 +513,4 @@ export default function HeadersWindow() {
     </div>
   )
 }
+

@@ -1,41 +1,65 @@
 import React from 'react'
-import { HeaderNode, HeaderTree, } from './components/Headers'
+import { HeaderNode, HeaderTree } from './components/Headers'
 
 declare global {
   interface Window {
     api: {
+      // Window
       winMinimize: () => Promise<void>
       winMaximize: () => Promise<void>
       winClose: () => Promise<void>
-      chooseDir: () => Promise<string | null>
+
+      // New explicit dialogs (platform-agnostic)
+      chooseFile: () => Promise<{ path: string; kind: 'file' } | null>
+      chooseDir:  () => Promise<{ path: string; kind: 'directory' } | null>
+
+      // Scan
       startScan: (root: string, options: any) => Promise<string>
       onScanProgress: (cb: (msg: any) => void) => void
       onScanResult: (cb: (msg: any) => void) => void
       onScanError: (cb: (msg: any) => void) => void
+
+      // Headers
       getHeaders: (path: string, options: any) => Promise<any>
+      openHeaderSeries: (payload: {
+        seriesKey: string
+        title: string
+        instances: { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }[]
+        activate?: boolean
+        tabKey?: string
+      }) => Promise<boolean>
+      openSingleFile: (filePath: string) => Promise<boolean>
     }
   }
 }
 
-
 const mono: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' }
 function btn() {
   return {
-    padding: '8px 12px', borderRadius: 8, border: '1px solid #1f2630',
-    background: '#0e1420', color: '#e6edf3', cursor: 'pointer'
+    padding: '8px 12px',
+    borderRadius: 8,
+    border: '1px solid #1f2630',
+    background: '#0e1420',
+    color: '#e6edf3',
+    cursor: 'pointer',
   } as React.CSSProperties
 }
 function Card(p: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...p} style={{
-      border: '1px solid #1f2630', borderRadius: 12, padding: 12,
-      ...(p.style || {})
-    }} />
+    <div
+      {...p}
+      style={{
+        border: '1px solid #1f2630',
+        borderRadius: 12,
+        padding: 12,
+        ...(p.style || {}),
+      }}
+    />
   )
 }
 
 export default function App() {
-  const [root, setRoot] = React.useState('')
+  const [selection, setSelection] = React.useState<{ path: string; kind: 'file' | 'directory' } | null>(null)
   const [jobId, setJobId] = React.useState<string | null>(null)
   const [progress, setProgress] = React.useState(0)
   const [index, setIndex] = React.useState<any | null>(null)
@@ -43,7 +67,15 @@ export default function App() {
 
   React.useEffect(() => {
     window.api.onScanProgress((msg) => {
-      if (msg.jobId === jobId) setProgress(Math.floor((msg.percent || 0) * 100))
+      if (msg.jobId === jobId) {
+        const pct =
+          typeof msg.percent === 'number'
+            ? msg.percent
+            : msg.total
+            ? (msg.processed || 0) / (msg.total || 1)
+            : 0
+        setProgress(Math.floor(pct * 100))
+      }
     })
     window.api.onScanResult((msg) => {
       if (msg.jobId === jobId) {
@@ -54,13 +86,34 @@ export default function App() {
     window.api.onScanError((msg) => setError(msg.error || 'Unknown error'))
   }, [jobId])
 
-  async function pick() {
-    const p = await window.api.chooseDir()
-    if (p) setRoot(p)
-  }
-  async function start() {
+  async function openFileNow() {
+    const chosen = await window.api.chooseFile()
+    if (!chosen) return
+    setSelection(chosen)
     setIndex(null); setError(null); setProgress(0)
-    const id = await window.api.startScan(root, { ignorePrivate: true, ignoreBulk: true, redactPHI: true })
+
+    const filePath = chosen.path
+    const title = filePath.split(/[\\/]/).pop() || 'DICOM'
+    await window.api.openSingleFile(filePath);
+    // await window.api.openHeaderSeries({
+    //   seriesKey: `single:${filePath}`,
+    //   title,
+    //   instances: [{ path: filePath }],
+    //   activate: true,
+    // })
+  }
+
+  async function openFolderNow() {
+    const chosen = await window.api.chooseDir()
+    if (!chosen) return
+    setSelection(chosen)
+    setIndex(null); setError(null); setProgress(0)
+
+    const id = await window.api.startScan(chosen.path, {
+      ignorePrivate: true,
+      ignoreBulk: true,
+      redactPHI: true,
+    })
     setJobId(id)
   }
 
@@ -71,34 +124,47 @@ export default function App() {
       <TitleBar />
 
       <div style={{ padding: 16 }}>
+        {/* Toolbar: two buttons; selection path shown read-only */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
-            value={root}
-            onChange={(e) => setRoot(e.target.value)}
-            placeholder="Select a folder…"
+            value={selection ? selection.path : ''}
+            readOnly
+            placeholder="No file or folder selected"
             style={{
-              flex: 1, padding: 8, borderRadius: 8, border: '1px solid #1f2630',
-              background: '#0e1420', color: '#e6edf3', outline: 'none'
+              flex: 1,
+              padding: 8,
+              borderRadius: 8,
+              border: '1px solid #1f2630',
+              background: '#0e1420',
+              color: '#e6edf3',
+              outline: 'none',
             }}
           />
-          <button onClick={pick} style={btn()}>Browse</button>
-          <button onClick={start} style={btn()}>Scan</button>
+          <button onClick={openFileNow} style={btn()}>Open File…</button>
+          <button onClick={openFolderNow} style={btn()}>Open Folder…</button>
         </div>
 
         {/* Progress */}
         {jobId && progress < 100 && (
           <div style={{ marginTop: 12 }}>
-            <div style={{ marginBottom: 6, opacity: .8 }}>Scanning DICOM headers… {progress}%</div>
+            <div style={{ marginBottom: 6, opacity: 0.8 }}>
+              Scanning DICOM headers… {progress}%
+            </div>
             <div style={{ height: 8, background: '#121822', border: '1px solid #1f2630', borderRadius: 999 }}>
-              <div style={{
-                width: `${progress}%`, height: '100%', background: '#3b82f6',
-                borderRadius: 999, transition: 'width .15s linear'
-              }} />
+              <div
+                style={{
+                  width: `${progress}%`,
+                  height: '100%',
+                  background: '#3b82f6',
+                  borderRadius: 999,
+                  transition: 'width .15s linear',
+                }}
+              />
             </div>
           </div>
         )}
 
-        {/* Summary (when ready) */}
+        {/* Summary */}
         {hasSummary && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             <Badge label="Patients" value={index.stats.patients} />
@@ -108,7 +174,7 @@ export default function App() {
             <div style={{ flexBasis: '100%' }} />
             <div style={{ color: '#a7b0be' }}>Modalities:</div>
             {Object.entries(index.stats.modalityBySeries as Record<string, number>)
-              .sort((a:any,b:any)=> b[1]-a[1])
+              .sort((a: any, b: any) => b[1] - a[1])
               .map(([mod, n]: any) => (
                 <Badge key={mod} label={mod} value={n} />
               ))}
@@ -119,11 +185,11 @@ export default function App() {
 
         {/* Empty state */}
         {index && (!index.patients || index.patients.length === 0) && (
-          <div style={{ marginTop: 16, opacity: .8 }}>No DICOM studies detected in this folder.</div>
+          <div style={{ marginTop: 16, opacity: 0.8 }}>No DICOM studies detected in this folder.</div>
         )}
 
         {/* Patients list */}
-        {index && (index.patients?.length > 0) && <PatientList data={index} />}
+        {index && index.patients?.length > 0 && <PatientList data={index} />}
       </div>
     </div>
   )
@@ -131,16 +197,18 @@ export default function App() {
 
 function Badge({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{
-      padding: '4px 10px',
-      border: '1px solid #1f2630',
-      background: '#121822',
-      color: '#e6edf3',
-      borderRadius: 999,
-      display: 'inline-flex',
-      gap: 6,
-      alignItems: 'center'
-    }}>
+    <div
+      style={{
+        padding: '4px 10px',
+        border: '1px solid #1f2630',
+        background: '#121822',
+        color: '#e6edf3',
+        borderRadius: 999,
+        display: 'inline-flex',
+        gap: 6,
+        alignItems: 'center',
+      }}
+    >
       <span style={{ color: '#a7b0be' }}>{label}:</span>
       <b>{String(value)}</b>
     </div>
@@ -151,9 +219,17 @@ function TitleBar() {
   return (
     <div
       style={{
-        height: 36, WebkitAppRegion: 'drag' as any, display: 'flex',
-        alignItems: 'center', justifyContent: 'space-between', padding: '0 8px',
-        background: '#0b0f14', borderBottom: '1px solid #1f2630', position: 'sticky', top: 0, zIndex: 10
+        height: 36,
+        WebkitAppRegion: 'drag' as any,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 8px',
+        background: '#0b0f14',
+        borderBottom: '1px solid #1f2630',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
       }}
     >
       <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
@@ -182,7 +258,7 @@ function WinBtn({ label, title, onClick, danger = false }:
   )
 }
 
-/* ---------------- Patients → Studies → Series table (unchanged except header text) ---------------- */
+/* ---------------- Patients → Studies → Series table (unchanged) ---------------- */
 
 function PatientList({ data }: { data: any }) {
   const [openPatient, setOpenPatient] = React.useState<string | null>(null)
@@ -246,7 +322,7 @@ function PatientList({ data }: { data: any }) {
                                 <th style={th()}>SeriesDescription</th>
                                 <th style={th()}>StudyDescription</th>
                                 <th style={th()}>Actions</th>
-                            </tr>
+                              </tr>
                             </thead>
                             <tbody>
                               {s.series.map((ser: any, i: number) => (
@@ -259,26 +335,29 @@ function PatientList({ data }: { data: any }) {
                                   <td style={td()}>{s.studyDescription || '-'}</td>
                                   <td style={td()}>
                                     {ser.instances?.[0]?.path ? (
- 
-                                    <button
-                                      onClick={() =>
-                                        window.api.openHeaderSeries({
-                                          seriesKey: ser.seriesUID || ser.SeriesInstanceUID || `${s.studyUID}:${ser.seriesNumber ?? i}`,
-                                          title: ser.seriesDescription || `${ser.modality || 'Series'}`,
-                                          instances: (ser.instances || []).map((inst: any) => ({
-                                            path: inst.path,
-                                            sop: inst.sop || inst.sopInstanceUID || inst.SOPInstanceUID || '',
-                                            instanceNumber: inst.instanceNumber ?? inst.InstanceNumber ?? null,
-                                            date: inst.date ?? inst.AcquisitionDate ?? inst.InstanceCreationDate ?? null,
-                                            time: inst.time ?? inst.AcquisitionTime ?? inst.InstanceCreationTime ?? null,
-                                          })),
-                                        })
-                                     }
-                                     style={btn()}
-                                     >
-                                      View headers
-                                     </button>                                 
-                                    ) : <span style={{ opacity: .6 }}>—</span>}
+                                      <button
+                                        onClick={() =>
+                                          window.api.openHeaderSeries({
+                                            seriesKey: ser.seriesUID || ser.SeriesInstanceUID || `${s.studyUID}:${ser.seriesNumber ?? i}`,
+                                            // title: ser.seriesDescription || `${ser.modality || 'Series'}`,
+                                            title: `${ser.modality || 'UNK'} — ${ser.seriesDescription || 'Series'}`,
+                                            instances: (ser.instances || []).map((inst: any) => ({
+                                              path: inst.path,
+                                              sop: inst.sop || inst.sopInstanceUID || inst.SOPInstanceUID || '',
+                                              instanceNumber: inst.instanceNumber ?? inst.InstanceNumber ?? null,
+                                              date: inst.date ?? inst.AcquisitionDate ?? inst.InstanceCreationDate ?? null,
+                                              time: inst.time ?? inst.AcquisitionTime ?? inst.InstanceCreationTime ?? null,
+                                            })),
+                                            activate: true,
+                                          })
+                                        }
+                                        style={btn()}
+                                      >
+                                        View headers
+                                      </button>
+                                    ) : (
+                                      <span style={{ opacity: 0.6 }}>—</span>
+                                    )}
                                   </td>
                                 </tr>
                               ))}
@@ -292,14 +371,11 @@ function PatientList({ data }: { data: any }) {
               </div>
             )}
 
+            {/* Optional modal single-file viewer still available */}
             {modal && (
               <Modal onClose={() => setModal(null)} title="DICOM Headers">
                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>File: {modal.path}</div>
-                {loadingHdr ? (
-                <div>Loading…</div>
-                ) : (
-                <HeaderTree nodes={modal.headers as HeaderNode[]} />
-                )}
+                {loadingHdr ? <div>Loading…</div> : <HeaderTree nodes={modal.headers as HeaderNode[]} />}
               </Modal>
             )}
           </Card>
@@ -330,6 +406,3 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
     </div>
   )
 }
-
-
-
