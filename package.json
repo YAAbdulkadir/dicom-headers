@@ -1,11 +1,28 @@
 {
   "name": "dicom-headers",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "dist-electron/main.js",
   "build": {
     "appId": "com.yasin.dicomheaders",
     "productName": "DICOM Headers",
+    "fileAssociations": [
+      {
+        "ext": [
+          "dcm",
+          "dicom",
+          "ima"
+        ],
+        "name": "DICOM file",
+        "mimeType": "application/dicom",
+        "role": "Viewer"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "files": [
       "dist/**",
       "dist-electron/**",
