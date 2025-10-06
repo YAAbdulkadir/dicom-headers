@@ -20,7 +20,17 @@ declare global {
       winMaximize: () => Promise<void>
       winClose: () => Promise<void>
       pingHeaders?: () => Promise<void>
-      copyText?: (text: string) => Promise<boolean>   // <-- used by CopyCell
+      copyText?: (text: string) => Promise<boolean>
+
+      // Native tab context menu — single-argument shape { tab, screenPos, payload }
+      showTabContextMenu?: (args: {
+        tab: { id: string; title: string; firstPath?: string }
+        screenPos: { x: number; y: number }
+        payload?: SeriesOpenPayload
+      }) => Promise<'copyPath' | 'splitRight' | 'splitLeft' | 'openInNewWindow' | 'cancel'>
+
+      // Optional explicit path (not required if main handles it from the menu)
+      openSeriesInNewWindow?: (payload: SeriesOpenPayload) => Promise<boolean>
     }
   }
 }
@@ -95,6 +105,7 @@ type Tab = {
   loading: boolean
   error?: string
   cache: Record<number, HeaderNode[]>
+  tabKey?: string
 }
 
 function useTabManager() {
@@ -118,14 +129,22 @@ function useTabManager() {
 
   React.useEffect(() => {
     const off = window.api.onHeadersAddTab((p: SeriesOpenPayload) => {
+      console.log('[renderer] onHeadersAddTab <-', {
+        seriesKey: p.seriesKey,
+        title: p.title,
+        n: p.instances?.length,
+        tabKey: p.tabKey
+      })
       setTabs(prev => {
         const existing = prev.find(t => t.seriesKey === p.seriesKey)
         if (existing) {
+          console.log('[renderer] tab exists; activate?', p.activate)
           if (p.activate) setActiveId(existing.id)
           return prev
         }
 
         const id = p.tabKey || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        console.log('[renderer] creating new tab', { id })
         const next: Tab = {
           id,
           seriesKey: p.seriesKey,
@@ -133,12 +152,16 @@ function useTabManager() {
           instances: p.instances || [],
           activeIdx: 0,
           loading: false,
-          cache: {}
+          cache: {},
+          tabKey: p.tabKey || id,
         }
 
         const first = next.instances[0]
         const withLoading = first ? { ...next, loading: true } : next
-        if (first) setTimeout(() => loadInstance(id, 0, first.path), 0)
+        if (first) {
+          console.log('[renderer] will load first instance', first.path)
+          setTimeout(() => loadInstance(id, 0, first.path), 0)
+        }
 
         if (p.activate) setActiveId(id)
         else if (!prev.length) setActiveId(id)
@@ -184,11 +207,13 @@ function TabButton({
   title,
   onClick,
   onClose,
+  onContextMenu,
 }: {
   active: boolean;
   title: string;
   onClick: () => void;
   onClose: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [hover, setHover] = React.useState(false)
 
@@ -205,6 +230,7 @@ function TabButton({
     maxWidth: 320,
     marginBottom: -1,
     position: 'relative',
+    WebkitAppRegion: 'no-drag',
   }
 
   const activeStyle: React.CSSProperties = {
@@ -229,6 +255,7 @@ function TabButton({
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{ ...base, ...(active ? activeStyle : inactiveStyle) }}
@@ -268,7 +295,7 @@ function TabButton({
   )
 }
 
-/* ---------------------- Copyable cell for Instances table ---------------------- */
+/* ---------------------- Copyable cell (instances table) ---------------------- */
 function CopyCell({
   text,
   children,
@@ -283,7 +310,6 @@ function CopyCell({
   const [copied, setCopied] = React.useState(false)
 
   async function onCopy(e: React.MouseEvent) {
-    // Let the row's onClick (select) still happen, but also copy
     await window.api.copyText?.(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 900)
@@ -294,11 +320,7 @@ function CopyCell({
     <div
       onClick={onCopy}
       title={title || 'Click to copy'}
-      style={{
-        position: 'relative',
-        cursor: 'copy',
-        ...style,
-      }}
+      style={{ position: 'relative', cursor: 'copy', ...style }}
     >
       <div style={{ pointerEvents: 'none' }}>{children ?? text}</div>
       {copied && (
@@ -325,6 +347,16 @@ function CopyCell({
 
 /* ---------------------- Main component ---------------------- */
 export default function HeadersWindow() {
+  React.useEffect(() => {
+    console.log('[renderer] HeadersWindow mounted; saying hello to main');
+    (async () => {
+      try {
+        await window.api.helloNewHeadersWindow?.();
+      } catch (e) {
+        console.warn('[renderer] helloNewHeadersWindow failed', e);
+      }
+    })();
+  }, []);
   const { tabs, setTabs, activeId, setActiveId, closeTab, loadInstance } = useTabManager()
   const active = tabs.find(t => t.id === activeId) || tabs[0]
 
@@ -339,16 +371,50 @@ export default function HeadersWindow() {
     }
   }
 
+  async function onTabContextMenu(tab: Tab, e: React.MouseEvent) {
+    e.preventDefault()
+    if (!window.api.showTabContextMenu) {
+      console.warn('[renderer] showTabContextMenu not exposed from preload')
+      return
+    }
+
+    const firstPath = tab.instances?.[0]?.path
+
+    // IMPORTANT: include payload so main can enable “Open in New Window”
+    const payload: SeriesOpenPayload = {
+      seriesKey: tab.seriesKey,
+      title: tab.title,
+      instances: tab.instances,
+      tabKey: tab.tabKey || tab.id,
+      activate: true,
+    }
+
+    const args = {
+      tab: { id: tab.id, title: tab.title, firstPath },
+      screenPos: { x: e.screenX, y: e.screenY }, // screen coords for popup
+      payload,
+    }
+
+    console.log('[renderer] calling showTabContextMenu with', { ...args, payload: { ...payload, instances: `(${payload.instances.length} items)` } })
+    try {
+      const choice = await window.api.showTabContextMenu(args as any)
+      console.log('[renderer] menu choice ->', choice)
+      // main handles copy/open; nothing else needed here
+    } catch (err) {
+      console.warn('[renderer] showTabContextMenu threw', err)
+    }
+  }
+
   const nodes: HeaderNode[] | undefined =
     active && active.cache[active.activeIdx] ? active.cache[active.activeIdx] : undefined
 
-  const th = { padding: '6px 8px', color: '#a7b0be', textAlign: 'center' }
+  const th = { padding: '6px 8px', color: '#a7b0be', textAlign: 'center' as const }
   const cellMono: React.CSSProperties = {
     ...mono,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    textAlign: 'center'
+    textAlign: 'center',
   }
 
   return (
@@ -361,7 +427,7 @@ export default function HeadersWindow() {
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
-        minHeight: 0
+        minHeight: 0,
       }}
     >
       <TitleBar />
@@ -379,6 +445,7 @@ export default function HeadersWindow() {
           borderBottom: '0',
           flexShrink: 0,
           minWidth: 0,
+          WebkitAppRegion: 'no-drag',
         }}
       >
         {/* underline behind all tabs */}
@@ -391,6 +458,7 @@ export default function HeadersWindow() {
             height: 1,
             background: '#141a22',
             zIndex: 0,
+            pointerEvents: 'none',
           }}
         />
         {tabs.map((t) => (
@@ -400,6 +468,7 @@ export default function HeadersWindow() {
             title={t.title}
             onClick={() => setActiveId(t.id)}
             onClose={() => closeTab(t.id)}
+            onContextMenu={(e) => onTabContextMenu(t, e)}
           />
         ))}
         <div style={{ marginLeft: 'auto', color: '#a7b0be', fontSize: 12, paddingBottom: 6 }}>
@@ -417,7 +486,7 @@ export default function HeadersWindow() {
           minHeight: 0,
           minWidth: 0,
           overflow: 'hidden',
-          borderTop: '1px solid #1f2630'
+          borderTop: '1px solid #1f2630',
         }}
       >
         {active ? (
@@ -429,7 +498,7 @@ export default function HeadersWindow() {
                   display: 'grid',
                   gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
                   padding: '6px 8px',
-                  borderBottom: '1px solid #1f2630'
+                  borderBottom: '1px solid #1f2630',
                 }}
               >
                 <div style={th}>#</div>
@@ -459,9 +528,7 @@ export default function HeadersWindow() {
                         gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
                         padding: '6px 8px',
                         borderBottom: '1px solid #1f2630',
-                        background: selected
-                          ? '#121822'
-                          : (i % 2 === 0 ? 'transparent' : '#0e1420'), // zebra stripe
+                        background: selected ? '#121822' : i % 2 === 0 ? 'transparent' : '#0e1420',
                         cursor: 'pointer',
                       }}
                     >
@@ -513,4 +580,3 @@ export default function HeadersWindow() {
     </div>
   )
 }
-

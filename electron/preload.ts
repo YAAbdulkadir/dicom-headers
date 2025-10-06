@@ -61,6 +61,21 @@ export type ChosenPath =
   | { path: string; kind: 'file' }
   | { path: string; kind: 'directory' }
 
+/* -------- New: tab context menu & new-window helpers (renderer-facing) ------- */
+export type TabMeta = {
+  id: string
+  title: string
+  firstPath?: string
+}
+
+export type ScreenPos = { x: number; y: number }
+export type TabMenuChoice =
+  | 'copyPath'
+  | 'splitRight'
+  | 'splitLeft'
+  | 'openInNewWindow'
+  | 'cancel'
+
 /* ------------------------------ API contract ---------------------------- */
 export interface RendererApi {
   // Window
@@ -87,16 +102,37 @@ export interface RendererApi {
   onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => () => void
   openSingleFile: (filePath: string) => Promise<boolean>
 
+  // Tab context menu + new-window
+  showTabContextMenu: (args: {
+    tab: TabMeta
+    screenPos: ScreenPos
+    payload?: SeriesOpenPayload
+  }) => Promise<TabMenuChoice>
+
+  openSeriesInNewWindow: (payload: SeriesOpenPayload) => Promise<boolean>
+
   copyText: (text: string) => Promise<boolean>
   pingHeaders?: () => Promise<void>
+  helloNewHeadersWindow: () => Promise<boolean>
 }
 
-const headersEventBuffer: any[] = []
-let headersListener: ((p: any)=>void) | null = null
+const headersEventBuffer: SeriesOpenPayload[] = []
+let headersListener: ((p: SeriesOpenPayload) => void) | null = null
 
-ipcRenderer.on('headers:add-tab', (_e, payload) => {
-  if (headersListener) headersListener(payload)
-  else headersEventBuffer.push(payload)
+ipcRenderer.on('headers:add-tab', (_e, payload: SeriesOpenPayload) => {
+  console.log('[preload] got headers:add-tab', {
+    title: payload?.title,
+    n: payload?.instances?.length,
+    tabKey: payload?.tabKey
+  })
+  if (headersListener) {
+    console.log('[preload] dispatching to listener immediately')
+    headersListener(payload)
+  }
+  else {
+    console.log('[preload] buffering (no listener yet)')
+    headersEventBuffer.push(payload)
+  }
 })
 
 /* ----------------------------- Implementation --------------------------- */
@@ -108,8 +144,10 @@ const api = {
   winFullScreenToggle: () => ipcRenderer.invoke('win:fullscreenToggle'),
 
   // Dialogs (explicit)
-  chooseFile: () => ipcRenderer.invoke('dialog:chooseFile') as Promise<ChosenPath | null>,
-  chooseDir: () => ipcRenderer.invoke('dialog:chooseDir') as Promise<ChosenPath | null>,
+  chooseFile: () =>
+    ipcRenderer.invoke('dialog:chooseFile') as Promise<ChosenPath | null>,
+  chooseDir: () =>
+    ipcRenderer.invoke('dialog:chooseDir') as Promise<ChosenPath | null>,
 
   // Scanning
   startScan: (root: string, options: ScanOptions) =>
@@ -141,27 +179,26 @@ const api = {
     ipcRenderer.invoke('headers:openSeries', payload),
 
   onHeadersAddTab: (cb: (payload: SeriesOpenPayload) => void) => {
+    console.log('[preload] onHeadersAddTab: listener registered, flushing', headersEventBuffer.length)
     headersListener = cb
-    // flush buffered events
-    while (headersEventBuffer.length) cb(headersEventBuffer.shift())
-      return () => { headersListener = null }
+    while (headersEventBuffer.length) cb(headersEventBuffer.shift()!)
+    return () => {
+      headersListener = null
+    }
   },
 
-  openSingleFile: (filePath: string) => ipcRenderer.invoke('headers:openSingleFile', filePath),
-  //   const h = (_e: IpcRendererEvent, payload: SeriesOpenPayload) => cb(payload)
-  //   ipcRenderer.on('headers:add-tab', h)
-  //   return () => ipcRenderer.off('headers:add-tab', h)
-  // },
+  openSingleFile: (filePath: string) =>
+    ipcRenderer.invoke('headers:openSingleFile', filePath),
 
+  // Handshake
   pingHeaders: () => ipcRenderer.invoke('headers:ping'),
 
+  // Copy helper
   copyText: async (text: string) => {
     try {
-      // Prefer Electron main-process clipboard (works everywhere)
       await ipcRenderer.invoke('util:copyText', String(text ?? ''))
       return true
     } catch {
-      // Fallback: try navigator.clipboard for good measure
       try {
         await navigator.clipboard.writeText(String(text ?? ''))
         return true
@@ -170,6 +207,27 @@ const api = {
       }
     }
   },
+
+  /* --------- NEW for Tab Context Menu / New Window (returns Promises!) -------- */
+  showTabContextMenu: (args: {
+    tab: TabMeta
+    screenPos: ScreenPos
+    payload?: SeriesOpenPayload
+  }) => {
+    console.log('[preload] showTabContextMenu -> ', args)
+    return ipcRenderer.invoke('tabs:showContextMenu', args) as Promise<TabMenuChoice>
+  },
+
+  openSeriesInNewWindow: (payload: SeriesOpenPayload) => {
+    console.log('[preload] openSeriesInNewWindow -> ', {
+      seriesKey: payload.seriesKey,
+      title: payload.title,
+      n: payload.instances?.length,
+    })
+    return ipcRenderer.invoke('headers:openSeriesInNewWindow', payload) as Promise<boolean>
+  },
+
+  helloNewHeadersWindow: () => ipcRenderer.invoke('headers:hello_new_window') as Promise<boolean>,
 } as const
 
 contextBridge.exposeInMainWorld('api', api)
