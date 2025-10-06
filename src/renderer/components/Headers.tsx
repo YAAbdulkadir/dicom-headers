@@ -349,7 +349,7 @@ export function HeaderTree({
 
 const thCell: React.CSSProperties = {
   textAlign: 'left',
-  padding: '6px 8px',
+  padding: '4px 6px',
   borderBottom: '1px solid #1f2630',
   position: 'sticky' as any,
   top: 0,
@@ -357,6 +357,8 @@ const thCell: React.CSSProperties = {
   background: '#121822',
   color: '#a7b0be',
   boxShadow: '0 1px 0 0 #1f2630 inset',
+  fontSize: 14,
+  lineHeight: 1.25,
 }
 
 export function NodeTableRows({
@@ -542,8 +544,10 @@ const btn: React.CSSProperties = {
 }
 
 const tdCell: React.CSSProperties = {
-  padding: '6px 8px',
+  padding: '3px 6px',
   borderBottom: '1px solid #1f2630',
   verticalAlign: 'top',
   userSelect: 'text',
+  fontSize: 14,
+  lineHeight: 1.25,
 }

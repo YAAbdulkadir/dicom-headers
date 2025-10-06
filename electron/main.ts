@@ -12,6 +12,8 @@ import {
   clipboard,
   Menu,
   screen,
+  nativeImage,
+  shell,
 } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
@@ -354,6 +356,63 @@ async function ensureHeadersWindow() {
   return headersWindow
 }
 
+function createAboutWindow(parent?: BrowserWindow) {
+  const name = app.getName()
+  const version = app.getVersion()
+
+  const about = new BrowserWindow({
+    width: 420,
+    height: 310,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    frame: false,
+    show: false,
+    backgroundColor: '#0b0f14',
+    autoHideMenuBar: true,
+    parent,
+    modal: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  })
+
+  const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>About ${name}</title>
+<style>
+  body { margin:0; font-family: ui-sans-serif, system-ui; background:#0b0f14; color:#e6edf3; }
+  .wrap { padding:16px; }
+  .title { font-size:16px; opacity:.9; display:flex; align-items:center; gap:8px; }
+  .muted { color:#a7b0be; }
+  .box { border:1px solid #1f2630; border-radius:8px; padding:12px; margin-top:12px; background:#0e1420; }
+  .row { margin:6px 0; }
+  .btn { position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:6px;
+          border:1px solid #1f2630; background:#0e1420; color:#e6edf3; cursor:pointer; }
+</style>
+</head>
+<body>
+  <button class="btn" onclick="window.close()" title="Close">×</button>
+  <div class="wrap">
+    <div class="title">About <strong>${name}</strong></div>
+    <div class="box">
+      <div class="row"><strong>Version:</strong> ${version}</div>
+      <div class="row muted">Electron ${process.versions.electron} • Chromium ${process.versions.chrome}</div>
+      <div class="row muted">Node ${process.versions.node}</div>
+    </div>
+    <div class="box">
+      <div class="row">A tiny utility to inspect DICOM headers.</div>
+      <div class="row muted">© ${new Date().getFullYear()}</div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  about.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+  about.once('ready-to-show', () => { about.show(); about.focus() })
+  return about
+}
+
 /* ---------------------------- Single instance lock --------------------------- */
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -632,8 +691,132 @@ ipcMain.handle('headers:hello_new_window', (evt) => {
 });
 
 
+// Return app meta (pulls author/homepage from package.json)
+// --- About window (small, frameless, standalone HTML) ---
+ipcMain.handle('win:openAbout', async () => {
+  const name = app.getName();
+  const version = app.getVersion();
+
+  const about = new BrowserWindow({
+    useContentSize: true,         // sizes refer to content, not full window frame
+    width: 440,                   // temporary; will be replaced after measuring
+    height: 300,                  // temporary; will be replaced after measuring
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    frame: false,
+    backgroundColor: '#0b0f14',
+    show: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const openExternal = (url: string) => { try { shell.openExternal(url); } catch {} };
+  about.webContents.setWindowOpenHandler(({ url }) => { openExternal(url); return { action: 'deny' }; });
+  about.webContents.on('will-navigate', (e, url) => { e.preventDefault(); openExternal(url); });
+
+  const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>About ${name}</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin:0; background:#0b0f14; color:#e6edf3; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; overflow:hidden; } /* no scrollbars */
+  .wrap { padding:16px; }
+  .title { font-size:16px; opacity:.9; display:flex; align-items:center; gap:8px; }
+  .muted { color:#a7b0be; }
+  .box { border:1px solid #1f2630; border-radius:8px; padding:12px; margin-top:12px; background:#0e1420; }
+  .row { margin:6px 0; }
+  .btn { position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:6px;
+         border:1px solid #1f2630; background:#0e1420; color:#e6edf3; cursor:pointer; }
+  a { color:#7aa2ff; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+  <button class="btn" onclick="window.close()" title="Close">×</button>
+  <div class="wrap">
+    <div class="title">About <strong>${name}</strong></div>
+    <div class="box">
+      <div class="row"><strong>Version:</strong> ${version}</div>
+      <div class="row muted">Electron ${process.versions.electron} • Chromium ${process.versions.chrome}</div>
+      <div class="row muted">Node ${process.versions.node}</div>
+    </div>
+    <div class="box">
+      <div class="row">A tiny utility to inspect DICOM headers.</div>
+      <div class="row"><strong>Author:</strong> Yasin Abdulkadir</div>
+      <div class="row"><strong>Website:</strong> <a href="https://github.com/YAAbdulkadir/dicom-headers" target="_blank" rel="noreferrer">github.com/YAAbdulkadir/dicom-headers</a></div>
+      <div class="row muted">© ${new Date().getFullYear()}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await about.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+  // Measure content size and resize window to fit exactly (no scrollbars)
+  try {
+    const { w, h } = await about.webContents.executeJavaScript(
+      `(() => {
+        const pad = 0; // we already include padding in layout
+        const doc = document.documentElement;
+        const width = Math.ceil(Math.max(doc.scrollWidth, doc.clientWidth)) + pad;
+        const height = Math.ceil(Math.max(doc.scrollHeight, doc.clientHeight)) + pad;
+        return { w: width, h: height };
+      })();`
+    );
+
+    // Add a tiny safety margin to avoid accidental clipping on some fonts/DPI
+    const margin = 4;
+    about.setContentSize(w + margin, h + margin);
+  } catch {
+    // fallback: leave default size
+  }
+
+  about.show();
+  about.focus();
+  return true;
+});
+
+
+// Open external URLs safely
+ipcMain.handle('util:openExternal', async (_evt, url: string) => {
+  try {
+    await shell.openExternal(String(url))
+    return true
+  } catch {
+    return false
+  }
+})
+
 /* --------------------------------- Utility ---------------------------------- */
 ipcMain.handle('util:copyText', (_evt, text: string) => {
   clipboard.writeText(String(text ?? ''))
   return true
 })
+
+ipcMain.handle('util:getAppIcon', async () => {
+  try {
+    const p = app.isPackaged
+      ? path.join(process.resourcesPath, 'icons', 'icon-256.png')
+      : path.join(process.cwd(), 'build', 'icons', 'icon-256.png');
+
+    // Optional: helpful logging while you test
+    // console.log('[main] util:getAppIcon path =', p, 'exists?', fs.existsSync(p));
+
+    const b64 = fs.readFileSync(p).toString('base64');
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    // Fallback: try getting the executable’s icon (Windows)
+    try {
+      const img = await app.getFileIcon(process.execPath, { size: 'large' as any });
+      return img.toDataURL();
+    } catch {}
+    return null;
+  }
+});

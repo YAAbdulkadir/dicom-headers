@@ -1,5 +1,5 @@
 // electron/preload.ts
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, IpcRenderer, ipcRenderer, IpcRendererEvent } from 'electron'
 
 /* ----------------------------- Shared types ----------------------------- */
 export type InstanceRef = {
@@ -76,6 +76,13 @@ export type TabMenuChoice =
   | 'openInNewWindow'
   | 'cancel'
 
+export type AppInfo = {
+  name: string
+  version: string
+  author?: string
+  homepage?: string
+}
+
 /* ------------------------------ API contract ---------------------------- */
 export interface RendererApi {
   // Window
@@ -114,6 +121,10 @@ export interface RendererApi {
   copyText: (text: string) => Promise<boolean>
   pingHeaders?: () => Promise<void>
   helloNewHeadersWindow: () => Promise<boolean>
+
+  getAppInfo: () => Promise<AppInfo>
+  getAppIcon: () => Promise<string | null>
+  openAbout: () => Promise<boolean>
 }
 
 const headersEventBuffer: SeriesOpenPayload[] = []
@@ -228,6 +239,13 @@ const api = {
   },
 
   helloNewHeadersWindow: () => ipcRenderer.invoke('headers:hello_new_window') as Promise<boolean>,
+
+  getAppInfo: () => ipcRenderer.invoke('app:getInfo') as Promise<AppInfo>,
+
+  openExternal: (url: string) => ipcRenderer.invoke('util:openExternal', url) as Promise<boolean>,
+
+  getAppIcon: () => ipcRenderer.invoke('util:getAppIcon') as Promise<string | null>,
+  openAbout: () => ipcRenderer.invoke('win:openAbout') as Promise<boolean>,
 } as const
 
 contextBridge.exposeInMainWorld('api', api)

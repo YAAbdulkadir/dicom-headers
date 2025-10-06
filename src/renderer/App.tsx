@@ -1,5 +1,6 @@
 import React from 'react'
 import { HeaderNode, HeaderTree } from './components/Headers'
+import TitleBar from './components/TitleBar'
 
 declare global {
   interface Window {
@@ -215,48 +216,48 @@ function Badge({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function TitleBar() {
-  return (
-    <div
-      style={{
-        height: 36,
-        WebkitAppRegion: 'drag' as any,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 8px',
-        background: '#0b0f14',
-        borderBottom: '1px solid #1f2630',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}
-    >
-      <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
-      <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
-        <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
-        <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
-        <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
-      </div>
-    </div>
-  )
-}
-function WinBtn({ label, title, onClick, danger = false }:
-  { label: string; title?: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      style={{
-        width: 36, height: 24, borderRadius: 6, border: '1px solid #1f2630',
-        background: danger ? '#1b0f13' : '#0e1420', color: danger ? '#ff6b6b' : '#e6edf3',
-        cursor: 'pointer', lineHeight: '20px'
-      }}
-    >
-      {label}
-    </button>
-  )
-}
+// function TitleBar() {
+//   return (
+//     <div
+//       style={{
+//         height: 36,
+//         WebkitAppRegion: 'drag' as any,
+//         display: 'flex',
+//         alignItems: 'center',
+//         justifyContent: 'space-between',
+//         padding: '0 8px',
+//         background: '#0b0f14',
+//         borderBottom: '1px solid #1f2630',
+//         position: 'sticky',
+//         top: 0,
+//         zIndex: 10,
+//       }}
+//     >
+//       <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
+//       <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
+//         <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
+//         <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
+//         <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
+//       </div>
+//     </div>
+//   )
+// }
+// function WinBtn({ label, title, onClick, danger = false }:
+//   { label: string; title?: string; onClick: () => void; danger?: boolean }) {
+//   return (
+//     <button
+//       title={title}
+//       onClick={onClick}
+//       style={{
+//         width: 36, height: 24, borderRadius: 6, border: '1px solid #1f2630',
+//         background: danger ? '#1b0f13' : '#0e1420', color: danger ? '#ff6b6b' : '#e6edf3',
+//         cursor: 'pointer', lineHeight: '20px'
+//       }}
+//     >
+//       {label}
+//     </button>
+//   )
+// }
 
 /* ---------------- Patients → Studies → Series table (unchanged) ---------------- */
 

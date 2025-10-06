@@ -1,6 +1,7 @@
 // src/renderer/HeadersWindow.tsx
 import React from 'react'
 import { HeaderNode, HeaderTree } from './components/Headers'
+import TitleBar from './components/TitleBar'
 
 type InstanceInfo = { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }
 type SeriesOpenPayload = {
@@ -22,6 +23,9 @@ declare global {
       pingHeaders?: () => Promise<void>
       copyText?: (text: string) => Promise<boolean>
 
+      getAppIcon?: () => Promise<string | null>
+      openAbout?: () => Promise<boolean>
+
       // Native tab context menu — single-argument shape { tab, screenPos, payload }
       showTabContextMenu?: (args: {
         tab: { id: string; title: string; firstPath?: string }
@@ -31,6 +35,7 @@ declare global {
 
       // Optional explicit path (not required if main handles it from the menu)
       openSeriesInNewWindow?: (payload: SeriesOpenPayload) => Promise<boolean>
+      helloNewHeadersWindow?: () => Promise<void>
     }
   }
 }
@@ -39,6 +44,13 @@ const mono: React.CSSProperties = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 }
 
+const COMPACT = {
+  fontSize: 14,
+  lineHeight: 1.25,
+  headerVPad: 4,
+  rowVPad: 2,
+  hPad: 6,
+}
 /* ---------------------- Small utilities ---------------------- */
 function fmtDate(d?: string | null) {
   return d && d.length >= 8 ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : (d ?? '—')
@@ -70,30 +82,60 @@ function WinBtn({
   )
 }
 
-function TitleBar() {
-  return (
-    <div
-      style={{
-        height: 36,
-        WebkitAppRegion: 'drag' as any,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 8px',
-        background: '#0b0f14',
-        borderBottom: '1px solid #1f2630',
-        position: 'sticky', top: 0, zIndex: 10
-      }}
-    >
-      <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
-      <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
-        <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
-        <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
-        <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
-      </div>
-    </div>
-  )
-}
+// function TitleBar() {
+//   const [iconUrl, setIconUrl] = React.useState<string | null>(null)
+  
+//   React.useEffect(() => {
+//     let mounted = true;
+//     (async () => {
+//       try {
+//         const url = await window.api.getAppIcon?.()
+//         if (mounted) setIconUrl(url ?? null)
+//       } catch {
+//     }
+//     })()
+//     return () => { mounted = false }
+//   }, [])
+
+//   return (
+//     <div
+//       style={{
+//         height: 36,
+//         WebkitAppRegion: 'drag' as any,
+//         display: 'flex',
+//         alignItems: 'center',
+//         justifyContent: 'space-between',
+//         padding: '0 8px',
+//         background: '#0b0f14',
+//         borderBottom: '1px solid #1f2630',
+//         position: 'sticky', top: 0, zIndex: 10
+//       }}
+//     >
+//       {/* Left: icon + title (non-draggable so clicks work) */}
+//       <div style={{ display: 'flex', alignItems: 'center', gap: 8, WebkitAppRegion: 'no-drag' as any }}>
+//         {iconUrl && (
+//           <img
+//             src={iconUrl}
+//             width={16}
+//             height={16}
+//             alt="App icon"
+//             title="About DICOM Headers"
+//             style={{ cursor: 'pointer', borderRadius: 3 }}
+//             onClick={() => window.api.openAbout?.()}
+//           />
+//         )}
+//         <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
+//       </div>
+
+//       {/* Right: window controls */}
+//       <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
+//         <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
+//         <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
+//         <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
+//       </div>
+//     </div>
+//   )
+// }
 
 /* ---------------------- Tabs state ---------------------- */
 type Tab = {
@@ -330,7 +372,7 @@ function CopyCell({
             right: 8,
             top: 4,
             fontSize: 10,
-            padding: '2px 6px',
+            padding: '1px 5px',
             border: '1px solid #2a3442',
             background: '#101826',
             color: '#b8c2d1',
@@ -408,13 +450,22 @@ export default function HeadersWindow() {
   const nodes: HeaderNode[] | undefined =
     active && active.cache[active.activeIdx] ? active.cache[active.activeIdx] : undefined
 
-  const th = { padding: '6px 8px', color: '#a7b0be', textAlign: 'center' as const }
+  const th = {
+    padding: `${COMPACT.headerVPad}px ${COMPACT.hPad}px`,
+    color: '#a7b0be',
+    textAlign: 'center' as const,
+    fontSize: COMPACT.fontSize,
+    lineHeight: COMPACT.lineHeight,
+  }
+
   const cellMono: React.CSSProperties = {
     ...mono,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     textAlign: 'center',
+    fontSize: COMPACT.fontSize,
+    lineHeight: COMPACT.lineHeight,
   }
 
   return (
@@ -497,7 +548,7 @@ export default function HeadersWindow() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                  padding: '6px 8px',
+                  padding: `${COMPACT.headerVPad}px ${COMPACT.hPad}px`,
                   borderBottom: '1px solid #1f2630',
                 }}
               >
@@ -526,7 +577,7 @@ export default function HeadersWindow() {
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                        padding: '6px 8px',
+                        padding: `${COMPACT.rowVPad}px ${COMPACT.hPad}px`,
                         borderBottom: '1px solid #1f2630',
                         background: selected ? '#121822' : i % 2 === 0 ? 'transparent' : '#0e1420',
                         cursor: 'pointer',
