@@ -1,6 +1,6 @@
 {
   "name": "dicom-headers",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "An app to view DICOM headers",
   "author": {
     "name": "Yasin Abdulkadir"
@@ -70,11 +70,20 @@
     "dist": "npm run build:renderer && npm run build:electron && electron-builder -mwl"
   },
   "devDependencies": {
-    "electron-builder": "^26.0.12"
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.10"
   },
   "dependencies": {
-    "electron-updater": "^6.6.2",
+    "dicom-data-dictionary": "^0.3.1",
     "dicom-parser": "^1.8.21",
-    "dicom-data-dictionary": "^0.3.1"
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.6.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }
