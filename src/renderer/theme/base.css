@@ -1,0 +1,26 @@
+:root {
+    color-scheme: light dark;   /* let controls adapt */
+}
+
+html, body, #root { height: 100%; background: var(--bg); color: var(--fg); }
+
+* {
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.btn {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: transparent;
+    color: var(--fg);
+}
+.btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn-danger { background: var(--danger); color: #fff; border-color: transparent; }
