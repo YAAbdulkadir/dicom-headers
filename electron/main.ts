@@ -14,12 +14,33 @@ import {
   screen,
   nativeImage,
   shell,
+  nativeTheme
 } from 'electron'
-import Store from 'electron-store'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
 import * as dicomParser from 'dicom-parser'
+import Store from 'electron-store'
+
+function log(...args: any[]) {
+  try { console.log('[MAIN]', ...args) } catch {}
+}
+function debugSendHeadersTab(win: BrowserWindow, payload: any, why: string) {
+  try {
+    console.log('[main] sending headers:addTab because', why)
+    win.webContents.send('headers:addTab', payload)
+  } catch (e) {
+    console.error('[main] failed to send headers:addTab', e)
+  }
+
+  // Temporary: also send the dashed variant in case the renderer listens there
+  try {
+    console.log('[main] also sending headers:add-tab (compat) because', why)
+    win.webContents.send('headers:add-tab', payload)
+  } catch (e) {
+    console.error('[main] failed to send headers:add-tab', e)
+  }
+}
 
 if (!app.isPackaged) {
   // Load .env for dev
@@ -29,11 +50,14 @@ if (!app.isPackaged) {
 
 type ThemeSource = 'system' | 'light' | 'dark' | `custom:${string}`
 
-const store = new Store<{ themeSource: ThemeSource }>()
+
+const store = new Store<{ themeSource: ThemeSource }>({
+  defaults: { themeSource: 'dark' }
+})
 const THEME_CHANNEL = 'theme:changed'
 
 function getSavedTheme(): ThemeSource {
-  return (store.get('themeSource') ?? 'system') as ThemeSource
+  return (store.get('themeSource') ?? 'dark') as ThemeSource
 }
 
 function currentThemePayload() {
@@ -42,6 +66,7 @@ function currentThemePayload() {
     shouldUseDarkColors: nativeTheme.shouldUseDarkColors,
   }
 }
+
 
 function setAppTheme(theme: ThemeSource) {
   // For now we just map custom:* to dark/light tokens in renderer.
@@ -57,7 +82,31 @@ function setAppTheme(theme: ThemeSource) {
 function broadcastTheme() {
   const payload = currentThemePayload()
   for (const w of BrowserWindow.getAllWindows()) {
-    w.webContents.send(THEME_CHANNEL, payload)
+    try {
+      const dark = nativeTheme.shouldUseDarkColors
+
+      // Always safe
+      try { w.setBackgroundColor?.(dark ? '#0b0f14' : '#ffffff') } catch {}
+
+      // ⚠️ Titlebar overlay can throw if not enabled at creation.
+      // Only attempt on Windows AND when the API exists; catch any runtime rejection.
+      if (process.platform === 'win32' && typeof (w as any).setTitleBarOverlay === 'function') {
+        try {
+          w.setTitleBarOverlay({
+            color: dark ? '#151a20' : '#f4f6f8',
+            symbolColor: dark ? '#ffffff' : '#000000',
+            height: 36,
+          })
+        } catch {
+          // Skip silently if overlay wasn't enabled for this window
+        }
+      }
+
+      // Finally, notify the renderer
+      w.webContents.send(THEME_CHANNEL, payload)
+    } catch {
+      // Per-window failures should never block the others
+    }
   }
 }
 
@@ -66,7 +115,7 @@ function tintAllWindows() {
   const bg = dark ? '#0b0f14' : '#ffffff'
   for (const w of BrowserWindow.getAllWindows()) {
     try { w.setBackgroundColor?.(bg) } catch {}
-    // If you use titleBarOverlay, you can also update it here.
+    // leave overlay tweaks to broadcastTheme; not required here
   }
 }
 
@@ -282,7 +331,6 @@ async function createStandaloneHeadersWindow(): Promise<BrowserWindow> {
     icon: process.platform === 'linux' ? iconPath() : undefined,
     width: 1200,
     height: 800,
-    // backgroundColor: '#0b0f14',
     backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     show: false,
@@ -294,6 +342,8 @@ async function createStandaloneHeadersWindow(): Promise<BrowserWindow> {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    titleBarStyle: 'hidden',
+    // titleBarOverlay: { height: 36 },
   })
 
   const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL
@@ -302,8 +352,27 @@ async function createStandaloneHeadersWindow(): Promise<BrowserWindow> {
     await win.loadURL(url)
   } else {
     const file = path.join(app.getAppPath(), 'dist', 'index.html')
+    // const file = distIndexPath()
+    log('loadFile (headers):', file, 'exists:', fs.existsSync(file))
     await win.loadFile(file, { hash: '/headers' })
   }
+
+  // extra event logs (helps us see exact timing)
+  win.webContents.on('did-start-loading', () => console.log('[headers] did-start-loading'))
+  win.webContents.on('dom-ready', () => console.log('[headers] dom-ready'))
+  win.webContents.on('did-frame-finish-load', (_e, isMain, frameProcessId, frameRoutingId) =>
+  console.log('[headers] did-frame-finish-load', { isMain, frameProcessId, frameRoutingId })
+  )
+  win.webContents.on('did-finish-load', () => console.log('[headers] did-finish-load'))
+
+  // diagnostics
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    log('did-fail-load (headers)', code, desc, url)
+    win.webContents.openDevTools({ mode: 'right' })
+  })
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    log('renderer console (headers):', { level, message, line, sourceId })
+  })
 
   // Max + show when ready
   win.once('ready-to-show', () => {
@@ -320,7 +389,6 @@ async function createWindow(opts?: { initiallyHidden?: boolean }) {
     width: 1200,
     height: 800,
     frame: false,
-    // backgroundColor: '#0b0f14',
     backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     fullscreen: false,
@@ -331,14 +399,27 @@ async function createWindow(opts?: { initiallyHidden?: boolean }) {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    titleBarStyle: 'hidden',
+    // titleBarOverlay: { height: 36 }
   })
 
   const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL
   if (isDev) {
     await mainWindow.loadURL(DEV_URL)
   } else {
-    await mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'))
+    const file = path.join(app.getAppPath(), 'dist', 'index.html')
+    log('loadFile (main):', file, 'exists:', fs.existsSync(file))
+    await mainWindow.loadFile(file)
   }
+
+  // diagnostics
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    log('did-fail-load (main)', code, desc, url)
+    mainWindow!.webContents.openDevTools({ mode: 'right' })
+  })
+  mainWindow.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    log('renderer console (main):', { level, message, line, sourceId })
+  })
 
   mainWindow.once('ready-to-show', () => {
     if (opts?.initiallyHidden || suppressMainInitialShow) return
@@ -349,6 +430,7 @@ async function createWindow(opts?: { initiallyHidden?: boolean }) {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
 }
 
 async function ensureHeadersWindow() {
@@ -361,7 +443,6 @@ async function ensureHeadersWindow() {
     icon: process.platform === 'linux' ? iconPath() : undefined,
     width: 1200,
     height: 800,
-    // backgroundColor: '#0b0f14',
     backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     show: false,
@@ -373,6 +454,7 @@ async function ensureHeadersWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    titleBarStyle: 'hidden',
   })
 
   headersWindow.webContents.on('did-finish-load', () => {
@@ -419,7 +501,6 @@ function createAboutWindow(parent?: BrowserWindow) {
     maximizable: false,
     frame: false,
     show: false,
-    // backgroundColor: '#0b0f14',
     backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     parent,
@@ -653,6 +734,11 @@ ipcMain.handle('headers:ping', () => {
 /* ---- Right-click tab context menu (performs action in main, returns choice) --- */
 ipcMain.handle('tabs:showContextMenu', async (evt, args: any) => {
   console.log('[main] tabs:showContextMenu <- ', args)
+  const saved = getSavedTheme()
+  const mapped = saved.startsWith('custom:')
+  ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light')
+  : saved
+  nativeTheme.themeSource = mapped as 'system' | 'light' | 'dark'
 
   // Accept { tab: {id,title,firstPath}, screenPos?, payload? }
   const tab = args?.tab ?? {}
@@ -682,26 +768,26 @@ ipcMain.handle('tabs:showContextMenu', async (evt, args: any) => {
           clipboard.writeText(String(tab.firstPath))
           console.log('[main] copied path to clipboard:', tab.firstPath)
         } else if (choice === 'openInNewWindow' && payload) {
-          console.log('[main] opening series in new window…', { title: payload.title, n: payload.instances?.length })
-          const newWin = await createStandaloneHeadersWindow()
+          // console.log('[main] opening series in new window…', { title: payload.title, n: payload.instances?.length })
+          // const newWin = await createStandaloneHeadersWindow()
 
-          // Queue the payload for that specific window, then flush either on did-finish-load
-          // or immediately if not loading. Also handle the explicit hello/flush from renderer.
-          queueInitialTabFor(newWin, payload);
+          // // Queue the payload for that specific window, then flush either on did-finish-load
+          // // or immediately if not loading. Also handle the explicit hello/flush from renderer.
+          // queueInitialTabFor(newWin, payload);
 
-          const sendNow = () => {
-            console.log('[main] (did-finish-load) flushing to new window');
-            flushInitialTabsTo(newWin);
-            bringToFrontFor(newWin);
-            // Small nudge after the menu closes to reliably steal focus on Win/Linux
-            setTimeout(() => bringToFrontFor(newWin), 50)
-          };
+          // const sendNow = () => {
+          //   console.log('[main] (did-finish-load) flushing to new window');
+          //   flushInitialTabsTo(newWin);
+          //   bringToFrontFor(newWin);
+          //   // Small nudge after the menu closes to reliably steal focus on Win/Linux
+          //   setTimeout(() => bringToFrontFor(newWin), 50)
+          // };
 
-          if (newWin.webContents.isLoading()) {
-            newWin.webContents.once('did-finish-load', sendNow)
-          } else {
-            sendNow()
-          }
+          // if (newWin.webContents.isLoading()) {
+          //   newWin.webContents.once('did-finish-load', sendNow)
+          // } else {
+          //   sendNow()
+          // }
         }
       } catch (err) {
         console.warn('[main] action failed:', err)
@@ -736,28 +822,48 @@ ipcMain.handle('tabs:showContextMenu', async (evt, args: any) => {
 ipcMain.handle('headers:openSeriesInNewWindow', async (_evt, payload: SeriesOpenPayload) => {
   console.log('[main] headers:openSeriesInNewWindow <-', { title: payload?.title, n: payload?.instances?.length });
   const newWin = await createStandaloneHeadersWindow();
+  
+  // Always log the current state
+  const loading = newWin.webContents.isLoadingMainFrame()
+  console.log('[main] new headers window id=', newWin.webContents.id, 'isLoadingMainFrame=', loading)
 
-  queueInitialTabFor(newWin, payload);
-
-  const sendNow = () => {
-    console.log('[main] (did-finish-load, explicit) flushing to new window');
-    flushInitialTabsTo(newWin);
-    bringToFrontFor(newWin);
-  };
-
-  if (newWin.webContents.isLoading()) {
-    newWin.webContents.once('did-finish-load', sendNow);
+  // send once immediately if possible...
+  if (!loading) {
+    debugSendHeadersTab(newWin, payload, 'main-frame not loading (immediate)')
   } else {
-    sendNow();
+    console.log('[main] main-frame still loading -> will wait for did-finish-load')
   }
 
-  return true;
+  // ...then also send on the key lifecycle events (belt-and-suspenders while debugging)
+  const onceFinish = () => {
+    debugSendHeadersTab(newWin, payload, 'did-finish-load')
+    newWin.webContents.removeListener('did-finish-load', onceFinish)
+  }
+  newWin.webContents.on('did-finish-load', onceFinish)
+
+  const onceDomReady = () => {
+    debugSendHeadersTab(newWin, payload, 'dom-ready')
+    newWin.webContents.removeListener('dom-ready', onceDomReady)
+  }
+  newWin.webContents.on('dom-ready', onceDomReady)
+
+  // Optional a short delayed send in case React mounted after did-finish-load
+  setTimeout(() => {
+    if (!newWin.isDestroyed()) {
+      debugSendHeadersTab(newWin, payload, 'fallback timeout 250ms after creation')
+    }
+  }, 250)
+
+  try { newWin.show(); newWin.focus() } catch {}
+
+  return true
+
 })
 
 ipcMain.handle('headers:hello_new_window', (evt) => {
   const win = BrowserWindow.fromWebContents(evt.sender);
   if (!win) return false;
-  console.log('[main] hello from new headers window', win.webContents.id);
+  console.log('[main] hello from new headers window', win.webContents.id, '-> flushInitialTabsTo()');
   flushInitialTabsTo(win);
   bringToFrontFor(win);
   return true;
@@ -771,14 +877,13 @@ ipcMain.handle('win:openAbout', async () => {
   const version = app.getVersion();
 
   const about = new BrowserWindow({
-    useContentSize: true,         // sizes refer to content, not full window frame
-    width: 440,                   // temporary; will be replaced after measuring
-    height: 300,                  // temporary; will be replaced after measuring
+    useContentSize: true,        
+    width: 440,                   
+    height: 300,                  
     resizable: false,
     minimizable: false,
     maximizable: false,
     frame: false,
-    // backgroundColor: '#0b0f14',
     backgroundColor: getWindowBg(),
     show: false,
     alwaysOnTop: true,

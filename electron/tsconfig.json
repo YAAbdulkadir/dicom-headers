@@ -4,6 +4,7 @@
     "outDir": "../dist-electron",
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "esModuleInterop": true,
     "noEmit": false
   },
   "include": ["./**/*.ts"]

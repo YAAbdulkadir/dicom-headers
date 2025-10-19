@@ -39,9 +39,9 @@ function btn() {
   return {
     padding: '8px 12px',
     borderRadius: 8,
-    border: '1px solid #1f2630',
-    background: '#0e1420',
-    color: '#e6edf3',
+    border: '1px solid var(--border)',
+    background: 'var(--panel)',
+    color: 'var(--fg)',
     cursor: 'pointer',
   } as React.CSSProperties
 }
@@ -50,9 +50,10 @@ function Card(p: React.HTMLAttributes<HTMLDivElement>) {
     <div
       {...p}
       style={{
-        border: '1px solid #1f2630',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         padding: 12,
+        background: 'var(--bg)',
         ...(p.style || {}),
       }}
     />
@@ -94,14 +95,7 @@ export default function App() {
     setIndex(null); setError(null); setProgress(0)
 
     const filePath = chosen.path
-    const title = filePath.split(/[\\/]/).pop() || 'DICOM'
-    await window.api.openSingleFile(filePath);
-    // await window.api.openHeaderSeries({
-    //   seriesKey: `single:${filePath}`,
-    //   title,
-    //   instances: [{ path: filePath }],
-    //   activate: true,
-    // })
+    await window.api.openSingleFile(filePath)
   }
 
   async function openFolderNow() {
@@ -121,7 +115,7 @@ export default function App() {
   const hasSummary = Boolean(index?.stats)
 
   return (
-    <div style={{ fontFamily: 'ui-sans-serif, system-ui', color: '#e6edf3', background: '#0b0f14', minHeight: '100vh' }}>
+    <div style={{ fontFamily: 'ui-sans-serif, system-ui', color: 'var(--fg)', background: 'var(--bg)', minHeight: '100vh' }}>
       <TitleBar />
 
       <div style={{ padding: 16 }}>
@@ -135,9 +129,9 @@ export default function App() {
               flex: 1,
               padding: 8,
               borderRadius: 8,
-              border: '1px solid #1f2630',
-              background: '#0e1420',
-              color: '#e6edf3',
+              border: '1px solid var(--border)',
+              background: 'var(--panel)',
+              color: 'var(--fg)',
               outline: 'none',
             }}
           />
@@ -148,15 +142,15 @@ export default function App() {
         {/* Progress */}
         {jobId && progress < 100 && (
           <div style={{ marginTop: 12 }}>
-            <div style={{ marginBottom: 6, opacity: 0.8 }}>
+            <div style={{ marginBottom: 6, color: 'var(--muted)' }}>
               Scanning DICOM headers… {progress}%
             </div>
-            <div style={{ height: 8, background: '#121822', border: '1px solid #1f2630', borderRadius: 999 }}>
+            <div style={{ height: 8, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 999 }}>
               <div
                 style={{
                   width: `${progress}%`,
                   height: '100%',
-                  background: '#3b82f6',
+                  background: 'var(--accent)',
                   borderRadius: 999,
                   transition: 'width .15s linear',
                 }}
@@ -173,7 +167,7 @@ export default function App() {
             <Badge label="Series" value={index.stats.series} />
             <Badge label="Instances" value={index.stats.instances} />
             <div style={{ flexBasis: '100%' }} />
-            <div style={{ color: '#a7b0be' }}>Modalities:</div>
+            <div style={{ color: 'var(--muted)' }}>Modalities:</div>
             {Object.entries(index.stats.modalityBySeries as Record<string, number>)
               .sort((a: any, b: any) => b[1] - a[1])
               .map(([mod, n]: any) => (
@@ -182,11 +176,11 @@ export default function App() {
           </div>
         )}
 
-        {error && <div style={{ marginTop: 12, color: '#ef4444' }}>Error: {error}</div>}
+        {error && <div style={{ marginTop: 12, color: 'var(--danger)' }}>Error: {error}</div>}
 
         {/* Empty state */}
         {index && (!index.patients || index.patients.length === 0) && (
-          <div style={{ marginTop: 16, opacity: 0.8 }}>No DICOM studies detected in this folder.</div>
+          <div style={{ marginTop: 16, color: 'var(--muted)' }}>No DICOM studies detected in this folder.</div>
         )}
 
         {/* Patients list */}
@@ -201,63 +195,20 @@ function Badge({ label, value }: { label: string; value: React.ReactNode }) {
     <div
       style={{
         padding: '4px 10px',
-        border: '1px solid #1f2630',
-        background: '#121822',
-        color: '#e6edf3',
+        border: '1px solid var(--border)',
+        background: 'var(--panel)',
+        color: 'var(--fg)',
         borderRadius: 999,
         display: 'inline-flex',
         gap: 6,
         alignItems: 'center',
       }}
     >
-      <span style={{ color: '#a7b0be' }}>{label}:</span>
+      <span style={{ color: 'var(--muted)' }}>{label}:</span>
       <b>{String(value)}</b>
     </div>
   )
 }
-
-// function TitleBar() {
-//   return (
-//     <div
-//       style={{
-//         height: 36,
-//         WebkitAppRegion: 'drag' as any,
-//         display: 'flex',
-//         alignItems: 'center',
-//         justifyContent: 'space-between',
-//         padding: '0 8px',
-//         background: '#0b0f14',
-//         borderBottom: '1px solid #1f2630',
-//         position: 'sticky',
-//         top: 0,
-//         zIndex: 10,
-//       }}
-//     >
-//       <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
-//       <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
-//         <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
-//         <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
-//         <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
-//       </div>
-//     </div>
-//   )
-// }
-// function WinBtn({ label, title, onClick, danger = false }:
-//   { label: string; title?: string; onClick: () => void; danger?: boolean }) {
-//   return (
-//     <button
-//       title={title}
-//       onClick={onClick}
-//       style={{
-//         width: 36, height: 24, borderRadius: 6, border: '1px solid #1f2630',
-//         background: danger ? '#1b0f13' : '#0e1420', color: danger ? '#ff6b6b' : '#e6edf3',
-//         cursor: 'pointer', lineHeight: '20px'
-//       }}
-//     >
-//       {label}
-//     </button>
-//   )
-// }
 
 /* ---------------- Patients → Studies → Series table (unchanged) ---------------- */
 
@@ -267,7 +218,7 @@ function PatientList({ data }: { data: any }) {
   const [modal, setModal] = React.useState<{ path: string, headers: any[] } | null>(null)
   const [loadingHdr, setLoadingHdr] = React.useState(false)
 
-  async function openHeaders(path: string) {
+  async function openHeaders(path: string) { // kept if you re-enable modal usage
     setLoadingHdr(true)
     const headers = await window.api.getHeaders(path, { ignorePrivate: true, ignoreBulk: true, redactPHI: true })
     setLoadingHdr(false)
@@ -276,7 +227,7 @@ function PatientList({ data }: { data: any }) {
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h3>Patients</h3>
+      <h3 style={{ color: 'var(--fg)' }}>Patients</h3>
 
       {data.patients.map((p: any) => {
         const pid = p.patient_id
@@ -315,7 +266,7 @@ function PatientList({ data }: { data: any }) {
                         <div style={{ marginTop: 10, overflow: 'auto' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                              <tr style={{ color: '#a7b0be', textAlign: 'left' }}>
+                              <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                                 <th style={th()}>PatientName</th>
                                 <th style={th()}>PatientID</th>
                                 <th style={th()}>Modality</th>
@@ -327,20 +278,19 @@ function PatientList({ data }: { data: any }) {
                             </thead>
                             <tbody>
                               {s.series.map((ser: any, i: number) => (
-                                <tr key={i} style={{ borderTop: '1px solid #1f2630' }}>
+                                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
                                   <td style={td()}><span style={mono}>{pname}</span></td>
                                   <td style={td()}><span style={mono}>{pid}</span></td>
-                                  <td style={td()}>{ser.modality || '-'}</td>
-                                  <td style={td()}>{ser.count ?? '-'}</td>
-                                  <td style={td()}>{ser.seriesDescription || '-'}</td>
-                                  <td style={td()}>{s.studyDescription || '-'}</td>
+                                  <td style={td()}>{(ser.modality || '-')}</td>
+                                  <td style={td()}>{(ser.count ?? '-')}</td>
+                                  <td style={td()}>{(ser.seriesDescription || '-')}</td>
+                                  <td style={td()}>{(s.studyDescription || '-')}</td>
                                   <td style={td()}>
                                     {ser.instances?.[0]?.path ? (
                                       <button
                                         onClick={() =>
                                           window.api.openHeaderSeries({
                                             seriesKey: ser.seriesUID || ser.SeriesInstanceUID || `${s.studyUID}:${ser.seriesNumber ?? i}`,
-                                            // title: ser.seriesDescription || `${ser.modality || 'Series'}`,
                                             title: `${ser.modality || 'UNK'} — ${ser.seriesDescription || 'Series'}`,
                                             instances: (ser.instances || []).map((inst: any) => ({
                                               path: inst.path,
@@ -375,7 +325,7 @@ function PatientList({ data }: { data: any }) {
             {/* Optional modal single-file viewer still available */}
             {modal && (
               <Modal onClose={() => setModal(null)} title="DICOM Headers">
-                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>File: {modal.path}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>File: {modal.path}</div>
                 {loadingHdr ? <div>Loading…</div> : <HeaderTree nodes={modal.headers as HeaderNode[]} />}
               </Modal>
             )}
@@ -395,9 +345,18 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex',
       alignItems: 'center', justifyContent: 'center', zIndex: 50
     }}>
-      <div style={{ width: 'min(900px, 96vw)', background: '#0b0f14', border: '1px solid #1f2630', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid #1f2630' }}>
-          <div style={{ fontWeight: 600 }}>{title}</div>
+      <div style={{
+        width: 'min(900px, 96vw)',
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        boxShadow: '0 20px 60px rgba(0,0,0,.35)'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: 12, borderBottom: '1px solid var(--border)', background: 'var(--panel)'
+        }}>
+          <div style={{ fontWeight: 600, color: 'var(--fg)' }}>{title}</div>
           <button onClick={onClose} style={{ ...btn(), padding: '4px 8px' }}>Close</button>
         </div>
         <div style={{ padding: 12 }}>

@@ -4,7 +4,7 @@ import { contextBridge, IpcRenderer, ipcRenderer, IpcRendererEvent } from 'elect
 // Theme types
 export type ThemeSource = 'system' | 'light' | 'dark' | `custom:${string}`
 export type ThemePayload = {
-  themeSource: ThemeSource
+  themeSource: ThemeSource;
   shouldUseDarkColors: boolean
 }
 
@@ -273,6 +273,18 @@ const api = {
   getAppIcon: () => ipcRenderer.invoke('util:getAppIcon') as Promise<string | null>,
   openAbout: () => ipcRenderer.invoke('win:openAbout') as Promise<boolean>,
 } as const
+
+// contextBridge.exposeInMainWorld('api', {
+//   theme: {
+//     get: () => ipcRenderer.invoke('theme:get') as Promise<ThemePayload>,
+//     set: (theme: ThemeSource) => ipcRenderer.invoke('theme:set', theme) as Promise<ThemePayload>,
+//     onDidChange: (cb: (p: ThemePayload) => void) => {
+//       const listener = (_e: IpcRendererEvent, p: ThemePayload) => cb(p)
+//       ipcRenderer.on(THEME_CHANNEL, listener)
+//       return () => ipcRenderer.off(THEME_CHANNEL, listener)
+//     },
+//   },
+// })
 
 contextBridge.exposeInMainWorld('api', api)
 

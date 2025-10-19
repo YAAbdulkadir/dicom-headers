@@ -45,6 +45,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setEffective(effective)
     setTokens(tokens)
     applyTokens(tokens)
+    const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null
+    if (meta) meta.content = tokens.bg
     // helpful data attributes for debugging or CSS hooks
     document.documentElement.setAttribute('data-themeSource', src)
     document.documentElement.setAttribute('data-effectiveTheme', effective)

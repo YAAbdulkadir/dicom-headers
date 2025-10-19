@@ -1,26 +1,99 @@
-:root {
-    color-scheme: light dark;   /* let controls adapt */
+/* src/renderer/theme/base.css */
+
+/* Let native controls adapt to theme (helps inputs/scrollbars on some platforms) */
+:root { color-scheme: light dark; }
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
 }
 
-html, body, #root { height: 100%; background: var(--bg); color: var(--fg); }
-
+/* Smooth theme transitions; respect reduced motion */
 * {
-    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }
 
+/* Cards & Buttons (unchanged semantics; uses theme tokens) */
 .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
-
 .btn {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 6px 10px;
-    background: transparent;
-    color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--fg);
 }
 .btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
-.btn-danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn-danger  { background: var(--danger); color: #fff; border-color: transparent; }
+
+/* ---------- Themed Scrollbars ---------- */
+
+/* Firefox */
+* {
+  /* track then thumb */
+  scrollbar-color: var(--scrollbarThumb) var(--scrollbarTrack);
+  scrollbar-width: thin; /* thin | auto */
+}
+
+/* Chromium/WebKit */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbarTrack);
+  /* subtle separator from content area */
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbarThumb);
+  border-radius: 10px;
+  /* creates a visible "gap" so thumb stands out from track */
+  border: 3px solid var(--scrollbarTrack);
+}
+
+::-webkit-scrollbar-thumb:hover  { background: var(--scrollbarThumbHover); }
+::-webkit-scrollbar-thumb:active { background: var(--scrollbarThumbActive); }
+
+::-webkit-scrollbar-corner { background: var(--scrollbarTrack); }
+
+/* Themed select (works in Chromium) */
+.themed-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 28px 4px 10px;
+  line-height: 1.2;
+  height: 28px;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Focus ring matches theme */
+.themed-select:focus {
+  border-color: var(--accent);
+}
+
+/* Optional: hover feedback */
+.themed-select:hover {
+  filter: brightness(1.03);
+}
+
+/* Make options readable on dark/light too */
+.themed-select option {
+  background: var(--panel);
+  color: var(--fg);
+}

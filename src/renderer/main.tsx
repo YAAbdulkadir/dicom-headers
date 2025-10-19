@@ -10,7 +10,7 @@ import './theme/base.css'
 // Lazy-load the headers window bundle
 const HeadersWindow = React.lazy(() => import('./HeadersWindow'))
 
-// console.log('[renderer] loaded entry: src/renderer/main.tsx')
+console.log('[renderer] loaded entry: src/renderer/main.tsx')
 
 declare global {
   interface Window {
@@ -23,7 +23,7 @@ function Router() {
   const [route, setRoute] = React.useState(getHash())
 
   React.useEffect(() => {
-    // console.log('[renderer:root] initial hash =', route)
+    console.log('[renderer:root] initial hash =', route)
     const onHash = () => setRoute(getHash())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
@@ -40,7 +40,7 @@ function Router() {
   // }, [])
 
   if (route.startsWith('#/headers')) {
-    // console.log('[renderer:root] rendering <HeadersWindow/>')
+    console.log('[renderer:root] rendering <HeadersWindow/>')
     return (
       <Suspense fallback={<div style={{padding:12}}>Loading headers window…</div>}>
         <HeadersWindow />
@@ -48,7 +48,7 @@ function Router() {
     )
   }
 
-  // console.log('[renderer:root] rendering <App/>')
+  console.log('[renderer:root] rendering <App/>')
   return <App />
 }
 
@@ -61,7 +61,7 @@ if (!rootEl) {
 }
 
 if (!window.__APP_ROOT__) {
-  // console.log('[renderer] creating root')
+  console.log('[renderer] creating root')
   window.__APP_ROOT__ = createRoot(rootEl)
 } else {
   console.warn('[renderer] root already exists — reusing')

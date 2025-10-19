@@ -39,22 +39,23 @@ export default function AboutWindow() {
   }, [])
 
   const label = (k: string) => (
-    <div style={{ width: 88, color: '#99a3b3', textAlign: 'right', paddingRight: 12 }}>{k}</div>
+    <div style={{ width: 88, color: 'var(--muted)', textAlign: 'right', paddingRight: 12 }}>{k}</div>
   )
 
   return (
     <div
       style={{
         fontFamily: 'ui-sans-serif, system-ui',
-        background: '#0b0f14',
-        color: '#e6edf3',
+        background: 'var(--bg)',
+        color: 'var(--fg)',
         width: 420,
         minHeight: 220,
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid #1f2630',
-        borderRadius: 10,
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
         overflow: 'hidden',
+        boxShadow: 'var(--shadow)',
       }}
     >
       {/* simple top bar */}
@@ -65,8 +66,9 @@ export default function AboutWindow() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 8px',
-          borderBottom: '1px solid #1f2630',
+          borderBottom: '1px solid var(--border)',
           WebkitAppRegion: 'drag' as any,
+          background: 'var(--panel)',
         }}
       >
         <div style={{ opacity: 0.75, fontSize: 13 }}>About</div>
@@ -76,7 +78,7 @@ export default function AboutWindow() {
           style={{
             WebkitAppRegion: 'no-drag',
             width: 24, height: 24, lineHeight: '20px', borderRadius: 6,
-            border: '1px solid #1f2630', background: '#0e1420', color: '#e6edf3', cursor: 'pointer'
+            border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--fg)', cursor: 'pointer'
           }}
         >
           ×
@@ -118,7 +120,7 @@ export default function AboutWindow() {
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: '#6bb2ff',
+                  color: 'var(--accent)',
                   cursor: 'pointer',
                   textDecoration: 'underline',
                   padding: 0,

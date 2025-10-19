@@ -2,6 +2,7 @@
 import React from 'react'
 import { HeaderNode, HeaderTree } from './components/Headers'
 import TitleBar from './components/TitleBar'
+import { ThemeProvider } from './theme/ThemeProvider'
 
 type InstanceInfo = { path: string; sop?: string; instanceNumber?: number; date?: string; time?: string }
 type SeriesOpenPayload = {
@@ -63,79 +64,7 @@ function fmtTime(t?: string | null) {
   return core + frac
 }
 
-/* ---------------------- Window controls ---------------------- */
-function WinBtn({
-  label, title, onClick, danger = false
-}: { label: string; title?: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      style={{
-        width: 36, height: 24, borderRadius: 6, border: '1px solid #1f2630',
-        background: danger ? '#1b0f13' : '#0e1420', color: danger ? '#ff6b6b' : '#e6edf3',
-        cursor: 'pointer', lineHeight: '20px'
-      }}
-    >
-      {label}
-    </button>
-  )
-}
 
-// function TitleBar() {
-//   const [iconUrl, setIconUrl] = React.useState<string | null>(null)
-  
-//   React.useEffect(() => {
-//     let mounted = true;
-//     (async () => {
-//       try {
-//         const url = await window.api.getAppIcon?.()
-//         if (mounted) setIconUrl(url ?? null)
-//       } catch {
-//     }
-//     })()
-//     return () => { mounted = false }
-//   }, [])
-
-//   return (
-//     <div
-//       style={{
-//         height: 36,
-//         WebkitAppRegion: 'drag' as any,
-//         display: 'flex',
-//         alignItems: 'center',
-//         justifyContent: 'space-between',
-//         padding: '0 8px',
-//         background: '#0b0f14',
-//         borderBottom: '1px solid #1f2630',
-//         position: 'sticky', top: 0, zIndex: 10
-//       }}
-//     >
-//       {/* Left: icon + title (non-draggable so clicks work) */}
-//       <div style={{ display: 'flex', alignItems: 'center', gap: 8, WebkitAppRegion: 'no-drag' as any }}>
-//         {iconUrl && (
-//           <img
-//             src={iconUrl}
-//             width={16}
-//             height={16}
-//             alt="App icon"
-//             title="About DICOM Headers"
-//             style={{ cursor: 'pointer', borderRadius: 3 }}
-//             onClick={() => window.api.openAbout?.()}
-//           />
-//         )}
-//         <div style={{ opacity: 0.7, fontSize: 13 }}>DICOM Headers</div>
-//       </div>
-
-//       {/* Right: window controls */}
-//       <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
-//         <WinBtn label="—" title="Minimize" onClick={() => window.api.winMinimize()} />
-//         <WinBtn label="▢" title="Max/Restore" onClick={() => window.api.winMaximize()} />
-//         <WinBtn label="×" title="Close" danger onClick={() => window.api.winClose()} />
-//       </div>
-//     </div>
-//   )
-// }
 
 /* ---------------------- Tabs state ---------------------- */
 type Tab = {
@@ -245,52 +174,34 @@ function useTabManager() {
 
 /* ---------------------- Tab button ---------------------- */
 function TabButton({
-  active,
-  title,
-  onClick,
-  onClose,
-  onContextMenu,
+  active, title, onClick, onClose, onContextMenu,
 }: {
-  active: boolean;
-  title: string;
-  onClick: () => void;
-  onClose: () => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
+  active: boolean; title: string; onClick: () => void; onClose: () => void; onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const [hover, setHover] = React.useState(false)
 
   const base: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 12px',
-    height: 32,
-    borderRadius: '8px 8px 0 0',
-    cursor: 'pointer',
-    userSelect: 'none',
-    transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
-    maxWidth: 320,
-    marginBottom: -1,
-    position: 'relative',
-    WebkitAppRegion: 'no-drag',
+    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+    height: 32, borderRadius: '8px 8px 0 0', cursor: 'pointer',
+    userSelect: 'none', transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
+    maxWidth: 320, marginBottom: -1, position: 'relative', WebkitAppRegion: 'no-drag',
   }
 
   const activeStyle: React.CSSProperties = {
-    background: '#0b0f14',
-    borderTop: '1px solid #1f2630',
-    borderLeft: '1px solid #1f2630',
-    borderRight: '1px solid #1f2630',
+    background: 'var(--bg)',
+    borderTop: '1px solid var(--border)',
+    borderLeft: '1px solid var(--border)',
+    borderRight: '1px solid var(--border)',
     borderBottom: '0',
-    color: '#e6edf3',
+    color: 'var(--fg)',
     zIndex: 2,
-    boxShadow: '0 1px 0 0 #0b0f14 inset',
   }
 
-  const inactiveBorder = hover ? '#1b2330' : '#141a22'
+  const inactiveBorder = 'var(--border)'
   const inactiveStyle: React.CSSProperties = {
-    background: hover ? '#141c27' : '#0e1420',
+    background: hover ? 'var(--panel)' : 'transparent',
     border: `1px solid ${inactiveBorder}`,
-    color: '#c6ced8',
+    color: 'var(--muted)',
     zIndex: 1,
   }
 
@@ -303,32 +214,18 @@ function TabButton({
       style={{ ...base, ...(active ? activeStyle : inactiveStyle) }}
       title={title}
     >
-      <span
-        style={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          paddingRight: 2,
-        }}
-      >
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 2 }}>
         {title}
       </span>
-
       <button
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         aria-label="Close tab"
         title="Close"
         style={{
-          width: 18,
-          height: 18,
-          lineHeight: '14px',
-          borderRadius: 4,
-          border: `1px solid ${inactiveBorder}`,
-          background: active ? '#101826' : hover ? '#0b0f14' : 'transparent',
-          color: '#e6edf3',
-          cursor: 'pointer',
-          opacity: active ? 1 : hover ? 1 : 0,
-          transition: 'opacity 120ms ease, background 120ms ease, border-color 120ms ease',
+          width: 18, height: 18, lineHeight: '14px', borderRadius: 4,
+          border: `1px solid ${inactiveBorder}`, background: 'transparent',
+          color: 'var(--fg)', cursor: 'pointer',
+          opacity: active || hover ? 1 : 0, transition: 'opacity 120ms ease',
         }}
       >
         ×
@@ -339,47 +236,24 @@ function TabButton({
 
 /* ---------------------- Copyable cell (instances table) ---------------------- */
 function CopyCell({
-  text,
-  children,
-  title,
-  style,
-}: {
-  text: string
-  children?: React.ReactNode
-  title?: string
-  style?: React.CSSProperties
-}) {
+  text, children, title, style,
+}: { text: string; children?: React.ReactNode; title?: string; style?: React.CSSProperties }) {
   const [copied, setCopied] = React.useState(false)
-
   async function onCopy(e: React.MouseEvent) {
     await window.api.copyText?.(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 900)
     e.stopPropagation()
   }
-
   return (
-    <div
-      onClick={onCopy}
-      title={title || 'Click to copy'}
-      style={{ position: 'relative', cursor: 'copy', ...style }}
-    >
+    <div onClick={onCopy} title={title || 'Click to copy'} style={{ position: 'relative', cursor: 'copy', ...style }}>
       <div style={{ pointerEvents: 'none' }}>{children ?? text}</div>
       {copied && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 8,
-            top: 4,
-            fontSize: 10,
-            padding: '1px 5px',
-            border: '1px solid #2a3442',
-            background: '#101826',
-            color: '#b8c2d1',
-            borderRadius: 6,
-            pointerEvents: 'none',
-          }}
-        >
+        <div style={{
+          position: 'absolute', right: 8, top: 4, fontSize: 10, padding: '1px 5px',
+          border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--muted)',
+          borderRadius: 6, pointerEvents: 'none',
+        }}>
           Copied!
         </div>
       )}
@@ -389,16 +263,6 @@ function CopyCell({
 
 /* ---------------------- Main component ---------------------- */
 export default function HeadersWindow() {
-  React.useEffect(() => {
-    console.log('[renderer] HeadersWindow mounted; saying hello to main');
-    (async () => {
-      try {
-        await window.api.helloNewHeadersWindow?.();
-      } catch (e) {
-        console.warn('[renderer] helloNewHeadersWindow failed', e);
-      }
-    })();
-  }, []);
   const { tabs, setTabs, activeId, setActiveId, closeTab, loadInstance } = useTabManager()
   const active = tabs.find(t => t.id === activeId) || tabs[0]
 
@@ -413,221 +277,176 @@ export default function HeadersWindow() {
     }
   }
 
-  async function onTabContextMenu(tab: Tab, e: React.MouseEvent) {
+  function onTabContextMenu(e: React.MouseEvent, t: Tab) {
     e.preventDefault()
-    if (!window.api.showTabContextMenu) {
-      console.warn('[renderer] showTabContextMenu not exposed from preload')
-      return
+
+    // Screen coordinates for Electron menu positioning
+    const screenPos = {
+      x: Math.round(window.screenX + e.clientX),
+      y: Math.round(window.screenY + e.clientY),
     }
 
-    const firstPath = tab.instances?.[0]?.path
-
-    // IMPORTANT: include payload so main can enable “Open in New Window”
-    const payload: SeriesOpenPayload = {
-      seriesKey: tab.seriesKey,
-      title: tab.title,
-      instances: tab.instances,
-      tabKey: tab.tabKey || tab.id,
-      activate: true,
+    const payload = {
+      seriesKey: t.seriesKey,
+      title: t.title,
+      instances: t.instances,
+      tabKey: t.tabKey,
+      activate: false,
     }
 
-    const args = {
-      tab: { id: tab.id, title: tab.title, firstPath },
-      screenPos: { x: e.screenX, y: e.screenY }, // screen coords for popup
+    window.api.showTabContextMenu?.({
+      tab: { id: t.id, title: t.title, firstPath: t.instances[0]?.path },
+      screenPos,
       payload,
-    }
-
-    console.log('[renderer] calling showTabContextMenu with', { ...args, payload: { ...payload, instances: `(${payload.instances.length} items)` } })
-    try {
-      const choice = await window.api.showTabContextMenu(args as any)
-      console.log('[renderer] menu choice ->', choice)
-      // main handles copy/open; nothing else needed here
-    } catch (err) {
-      console.warn('[renderer] showTabContextMenu threw', err)
-    }
+    }).then(async (action) => {
+      switch (action) {
+        case 'copyPath':
+          if (t.instances[0]?.path) await window.api.copyText?.(t.instances[0].path)
+            break
+        case 'openInNewWindow':
+          await window.api.openSeriesInNewWindow?.(payload)
+          break
+        case 'splitRight':
+        case 'splitLeft':
+        case 'cancel':
+        default:
+          // TODO: hook up split view if/when implemented
+          break
+      }
+    }).catch(() => { /* ignore */ })
   }
 
-  const nodes: HeaderNode[] | undefined =
-    active && active.cache[active.activeIdx] ? active.cache[active.activeIdx] : undefined
-
-  const th = {
-    padding: `${COMPACT.headerVPad}px ${COMPACT.hPad}px`,
-    color: '#a7b0be',
-    textAlign: 'center' as const,
-    fontSize: COMPACT.fontSize,
-    lineHeight: COMPACT.lineHeight,
-  }
-
+  const nodes = active?.cache?.[active.activeIdx]
+  const th = { padding: '4px 6px', color: 'var(--muted)', textAlign: 'center' as const, fontSize: 14, lineHeight: 1.25 }
   const cellMono: React.CSSProperties = {
-    ...mono,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    textAlign: 'center',
-    fontSize: COMPACT.fontSize,
-    lineHeight: COMPACT.lineHeight,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center',
+    fontSize: 14, lineHeight: 1.25,
   }
 
   return (
-    <div
-      style={{
-        fontFamily: 'ui-sans-serif, system-ui',
-        color: '#e6edf3',
-        background: '#0b0f14',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        minWidth: 0,
-        minHeight: 0,
-      }}
-    >
-      <TitleBar />
+    <ThemeProvider>
+      <div style={{
+          fontFamily: 'ui-sans-serif, system-ui',
+          color: 'var(--fg)',
+          background: 'var(--bg)',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          minHeight: 0,
+        }}>
+        <TitleBar />
 
-      {/* Tabs */}
-      <div
-        style={{
+        {/* Tabs */}
+        <div style={{
           position: 'relative',
           display: 'flex',
           alignItems: 'flex-end',
           gap: 6,
           padding: '0 8px',
           paddingTop: 8,
-          background: '#0b0f14',
-          borderBottom: '0',
+          background: 'var(--panel)',
           flexShrink: 0,
           minWidth: 0,
           WebkitAppRegion: 'no-drag',
-        }}
-      >
-        {/* underline behind all tabs */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 1,
-            background: '#141a22',
-            zIndex: 0,
-            pointerEvents: 'none',
-          }}
-        />
-        {tabs.map((t) => (
-          <TabButton
-            key={t.id}
-            active={t.id === active?.id}
-            title={t.title}
-            onClick={() => setActiveId(t.id)}
-            onClose={() => closeTab(t.id)}
-            onContextMenu={(e) => onTabContextMenu(t, e)}
-          />
-        ))}
-        <div style={{ marginLeft: 'auto', color: '#a7b0be', fontSize: 12, paddingBottom: 6 }}>
-          {tabs.length ? `${tabs.length} tab${tabs.length > 1 ? 's' : ''}` : 'Open a header from the main window'}
+        }}>
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: 1,
+            background: 'var(--border)', zIndex: 0, pointerEvents: 'none',
+          }} />
+          {tabs.map((t) => (
+            <TabButton
+              key={t.id}
+              active={t.id === active?.id}
+              title={t.title}
+              onClick={() => setActiveId(t.id)}
+              onClose={() => closeTab(t.id)}
+              onContextMenu={(e) => onTabContextMenu(e, t)}
+            />
+          ))}
+          <div style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 12, paddingBottom: 6 }}>
+            {tabs.length ? `${tabs.length} tab${tabs.length > 1 ? 's' : ''}` : 'Open a header from the main window'}
+          </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          padding: 12,
-          minHeight: 0,
-          minWidth: 0,
-          overflow: 'hidden',
-          borderTop: '1px solid #1f2630',
-        }}
-      >
-        {active ? (
-          <>
-            {/* Instances */}
-            <div style={{ border: '1px solid #1f2630', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-              <div
-                style={{
+        {/* Content */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 12, padding: 12,
+          minHeight: 0, minWidth: 0, overflow: 'hidden', borderTop: '1px solid var(--border)',
+        }}>
+          {active ? (
+            <>
+              {/* Instances list */}
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+                background: 'var(--bg)',
+              }}>
+                <div style={{
                   display: 'grid',
                   gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                  padding: `${COMPACT.headerVPad}px ${COMPACT.hPad}px`,
-                  borderBottom: '1px solid #1f2630',
-                }}
-              >
-                <div style={th}>#</div>
-                <div style={th}>SOPInstanceUID</div>
-                <div style={th}>Instance</div>
-                <div style={th}>Date</div>
-                <div style={th}>Time</div>
-                <div style={th}>Path</div>
+                  padding: '4px 6px',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'var(--panel)',
+                }}>
+                  <div style={th}>#</div>
+                  <div style={th}>SOPInstanceUID</div>
+                  <div style={th}>Instance</div>
+                  <div style={th}>Date</div>
+                  <div style={th}>Time</div>
+                  <div style={th}>Path</div>
+                </div>
+                <div style={{ maxHeight: 160, overflow: 'auto' }}>
+                  {active.instances.map((inst, i) => {
+                    const selected = i === active.activeIdx
+                    const bg = selected ? 'var(--panel)' : i % 2 ? 'transparent' : 'var(--bg)'
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => selectInstance(i)}
+                        title={inst.path}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
+                          padding: '2px 6px',
+                          borderBottom: '1px solid var(--border)',
+                          background: bg,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <CopyCell text={String(i + 1)} style={cellMono}>{i + 1}</CopyCell>
+                        <CopyCell text={inst.sop ?? '—'} style={cellMono}>{inst.sop ?? '—'}</CopyCell>
+                        <CopyCell text={String(inst.instanceNumber ?? '—')} style={cellMono}>{inst.instanceNumber ?? '—'}</CopyCell>
+                        <CopyCell text={inst.date ?? '—'} style={cellMono}>{inst.date ?? '—'}</CopyCell>
+                        <CopyCell text={inst.time ?? '—'} style={cellMono}>{inst.time ?? '—'}</CopyCell>
+                        <CopyCell text={inst.path ?? ''} style={cellMono}>{inst.path}</CopyCell>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div style={{ maxHeight: 160, overflow: 'auto' }}>
-                {active.instances.map((inst: any, i: number) => {
-                  const selected = i === active.activeIdx
 
-                  const sop = inst.sop || '—'
-                  const instanceStr = inst.instanceNumber ?? '—'
-                  const dateStr = fmtDate(inst.date)
-                  const timeStr = fmtTime(inst.time)
-                  const pathStr = inst.path
-
-                  return (
-                    <div
-                      key={i}
-                      onClick={() => selectInstance(i)}
-                      title={inst.path}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '56px 1fr 120px 120px 120px 2fr',
-                        padding: `${COMPACT.rowVPad}px ${COMPACT.hPad}px`,
-                        borderBottom: '1px solid #1f2630',
-                        background: selected ? '#121822' : i % 2 === 0 ? 'transparent' : '#0e1420',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <CopyCell text={String(i + 1)} style={cellMono} title="Copy row #">
-                        {i + 1}
-                      </CopyCell>
-                      <CopyCell text={sop} style={cellMono} title="Copy SOPInstanceUID">
-                        {sop}
-                      </CopyCell>
-                      <CopyCell text={String(instanceStr)} style={cellMono} title="Copy Instance Number">
-                        {instanceStr}
-                      </CopyCell>
-                      <CopyCell text={dateStr} style={cellMono} title="Copy Date">
-                        {dateStr}
-                      </CopyCell>
-                      <CopyCell text={timeStr} style={cellMono} title="Copy Time">
-                        {timeStr}
-                      </CopyCell>
-                      <CopyCell text={pathStr} style={cellMono} title="Copy full path">
-                        {pathStr}
-                      </CopyCell>
-                    </div>
-                  )
-                })}
-                {active.instances.length === 0 && (
-                  <div style={{ padding: '8px 10px', color: '#a7b0be' }}>No instances in this series.</div>
+              {/* Header Tree */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+                {active.loading && !nodes && <div>Loading headers…</div>}
+                {active.error && <div style={{ color: 'var(--danger)' }}>Error: {active.error}</div>}
+                {nodes && (
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <HeaderTree nodes={nodes} initialOpen={false} fillHeight />
+                  </div>
+                )}
+                {!active.loading && !nodes && !active.error && (
+                  <div style={{ opacity: 0.7 }}>Select an instance above to view headers.</div>
                 )}
               </div>
-            </div>
-
-            {/* Headers */}
-            <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
-              {active.loading && !nodes && <div>Loading headers…</div>}
-              {active.error && <div style={{ color: '#ef4444' }}>Error: {active.error}</div>}
-              {nodes && (
-                <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                  <HeaderTree nodes={nodes} initialOpen={false} fillHeight />
-                </div>
-              )}
-              {!active.loading && !nodes && !active.error && (
-                <div style={{ opacity: 0.7 }}>Select an instance above to view headers.</div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div style={{ opacity: 0.7 }}>No tabs open.</div>
-        )}
+            </>
+          ) : (
+            <div style={{ opacity: 0.7 }}>No tabs open.</div>
+          )}
+        </div>
       </div>
-    </div>
+    </ThemeProvider>
   )
+    
 }

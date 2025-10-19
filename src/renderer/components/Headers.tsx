@@ -140,9 +140,9 @@ function CopyableTd({
             fontSize: 11,
             padding: '2px 6px',
             borderRadius: 6,
-            border: '1px solid #1f2630',
-            background: '#0e1420',
-            color: '#a7b0be',
+            border: '1px solid var(--border)', //'1px solid #1f2630',
+            background: 'var(--panel)', //'#0e1420',
+            color: 'var(--muted)', //'#a7b0be',
             pointerEvents: 'none',
           }}
         >
@@ -187,9 +187,9 @@ function ArrayPreview({
           <button
             onClick={expandAll}
             style={{
-              border: '1px solid #1f2630',
-              background: '#0e1420',
-              color: '#e6edf3',
+              border: '1px solid var(--border)',
+              background: 'var(--panel)',
+              color: 'var(--fg)',
               borderRadius: 6,
               padding: '0 6px',
               cursor: 'pointer',
@@ -206,9 +206,9 @@ function ArrayPreview({
           onClick={collapse}
           style={{
             marginLeft: 6,
-            border: '1px solid #1f2630',
-            background: '#0e1420',
-            color: '#a7b0be',
+            border: '1px solid var(--border)',
+            background: 'var(--panel)',
+            color: 'var(--muted)',
             borderRadius: 6,
             padding: '0 6px',
             cursor: 'pointer',
@@ -274,8 +274,8 @@ export function HeaderTree({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           style={{
-            flex: 1, padding: 8, borderRadius: 8, border: '1px solid #1f2630',
-            background: '#0e1420', color: '#e6edf3', outline: 'none', minWidth: 0,
+            flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
+            background: 'var(--panel)', color: 'var(--fg)', outline: 'none', minWidth: 0,
           }}
         />
         <button onClick={expandAll} style={btn}>Expand all</button>
@@ -285,7 +285,7 @@ export function HeaderTree({
       {/* Scroll container */}
       <div
         style={{
-          border: '1px solid #1f2630',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           overflowX: 'auto',
           overflowY: 'auto',
@@ -294,6 +294,7 @@ export function HeaderTree({
           ...(fillHeight ? { flex: 1, minHeight: 0 } : { maxHeight: 480 }),
           minWidth: 0,
           position: 'relative',
+          background: 'var(--bg)',
         }}
       >
         <div style={{ display: 'block', minWidth: '100%' }}>
@@ -350,13 +351,13 @@ export function HeaderTree({
 const thCell: React.CSSProperties = {
   textAlign: 'left',
   padding: '4px 6px',
-  borderBottom: '1px solid #1f2630',
+  borderBottom: '1px solid var(--border)',
   position: 'sticky' as any,
   top: 0,
   zIndex: 1,
-  background: '#121822',
-  color: '#a7b0be',
-  boxShadow: '0 1px 0 0 #1f2630 inset',
+  background: 'var(--panel)',
+  color: 'var(--muted)',
+  boxShadow: '0 1px 0 0 var(--border) inset',
   fontSize: 14,
   lineHeight: 1.25,
 }
@@ -391,7 +392,7 @@ export function NodeTableRow({
   React.useEffect(() => { setOpen(defaultOpen) }, [defaultOpen, openVersion])
 
   const rowIndex = rowIndexRef.current++;
-  const rowBg = (rowIndex % 2 === 1) ? '#0f1622' : 'transparent'; // subtle zebra
+  const rowBg = (rowIndex % 2 === 1) ? 'var(--panel)' : 'transparent'
   const isSeq =
     (node.children && node.children.length > 0) ||
     node.vr === 'SQ' ||
@@ -463,8 +464,8 @@ export function NodeTableRow({
                   aria-label={open ? 'Collapse' : 'Expand'}
                   style={{
                     width: 18, height: 18, lineHeight: '14px',
-                    borderRadius: 4, border: '1px solid #1f2630',
-                    background: '#0e1420', color: '#e6edf3', cursor: 'pointer',
+                    borderRadius: 4, border: '1px solid var(--border)',
+                    background: 'var(--panel)', color: 'var(--fg)', cursor: 'pointer',
                     userSelect: 'none', textAlign: 'center', padding: 0,
                   }}
                 >
@@ -534,18 +535,19 @@ export function NodeTableRow({
 
 /* ===================== Styling bits ===================== */
 
+
 const btn: React.CSSProperties = {
   padding: '8px 12px',
   borderRadius: 8,
-  border: '1px solid #1f2630',
-  background: '#0e1420',
-  color: '#e6edf3',
+  border: '1px solid var(--border)',
+  background: 'var(--panel)',
+  color: 'var(--fg)',
   cursor: 'pointer',
 }
 
 const tdCell: React.CSSProperties = {
   padding: '3px 6px',
-  borderBottom: '1px solid #1f2630',
+  borderBottom: '1px solid var(--border)',
   verticalAlign: 'top',
   userSelect: 'text',
   fontSize: 14,
