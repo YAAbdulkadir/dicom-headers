@@ -15,6 +15,7 @@ import {
   nativeImage,
   shell,
 } from 'electron'
+import Store from 'electron-store'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { Worker } from 'node:worker_threads'
@@ -24,6 +25,53 @@ if (!app.isPackaged) {
   // Load .env for dev
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('dotenv').config()
+}
+
+type ThemeSource = 'system' | 'light' | 'dark' | `custom:${string}`
+
+const store = new Store<{ themeSource: ThemeSource }>()
+const THEME_CHANNEL = 'theme:changed'
+
+function getSavedTheme(): ThemeSource {
+  return (store.get('themeSource') ?? 'system') as ThemeSource
+}
+
+function currentThemePayload() {
+  return {
+    themeSource: getSavedTheme(),
+    shouldUseDarkColors: nativeTheme.shouldUseDarkColors,
+  }
+}
+
+function setAppTheme(theme: ThemeSource) {
+  // For now we just map custom:* to dark/light tokens in renderer.
+  // nativeTheme only accepts 'system' | 'light' | 'dark'
+  const t = theme.startsWith('custom:') ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : theme
+  nativeTheme.themeSource = t as 'system' | 'light' | 'dark'
+  store.set('themeSource', theme)
+  broadcastTheme()
+  // Optionally re-tint existing windows instantly:
+  tintAllWindows()
+}
+
+function broadcastTheme() {
+  const payload = currentThemePayload()
+  for (const w of BrowserWindow.getAllWindows()) {
+    w.webContents.send(THEME_CHANNEL, payload)
+  }
+}
+
+function tintAllWindows() {
+  const dark = nativeTheme.shouldUseDarkColors
+  const bg = dark ? '#0b0f14' : '#ffffff'
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.setBackgroundColor?.(bg) } catch {}
+    // If you use titleBarOverlay, you can also update it here.
+  }
+}
+
+function getWindowBg() {
+  return nativeTheme.shouldUseDarkColors ? '#0b0f14' : '#ffffff'
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -234,7 +282,8 @@ async function createStandaloneHeadersWindow(): Promise<BrowserWindow> {
     icon: process.platform === 'linux' ? iconPath() : undefined,
     width: 1200,
     height: 800,
-    backgroundColor: '#0b0f14',
+    // backgroundColor: '#0b0f14',
+    backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     show: false,
     frame: false,
@@ -271,7 +320,8 @@ async function createWindow(opts?: { initiallyHidden?: boolean }) {
     width: 1200,
     height: 800,
     frame: false,
-    backgroundColor: '#0b0f14',
+    // backgroundColor: '#0b0f14',
+    backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     fullscreen: false,
     fullscreenable: false,
@@ -311,7 +361,8 @@ async function ensureHeadersWindow() {
     icon: process.platform === 'linux' ? iconPath() : undefined,
     width: 1200,
     height: 800,
-    backgroundColor: '#0b0f14',
+    // backgroundColor: '#0b0f14',
+    backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     show: false,
     frame: false,
@@ -368,7 +419,8 @@ function createAboutWindow(parent?: BrowserWindow) {
     maximizable: false,
     frame: false,
     show: false,
-    backgroundColor: '#0b0f14',
+    // backgroundColor: '#0b0f14',
+    backgroundColor: getWindowBg(),
     autoHideMenuBar: true,
     parent,
     modal: false,
@@ -446,6 +498,16 @@ if (process.platform === 'win32') {
 
 /* -------------------------------- App Ready --------------------------------- */
 app.whenReady().then(async () => {
+  setAppTheme(getSavedTheme())
+
+  // If OS theme flips and we're in `system`, notify renderers
+  nativeTheme.on('updated', () => {
+    if (getSavedTheme() === 'system') {
+      broadcastTheme()
+      tintAllWindows()
+    }
+  })
+
   if (launchHasFiles) {
     await openDicomFiles(pendingOpenPaths.splice(0))
   } else {
@@ -479,6 +541,7 @@ app.on('will-quit', () => {
 })
 
 /* ------------------------------ IPC: window ops ----------------------------- */
+ipcMain.handle('theme:get', () => currentThemePayload())
 ipcMain.handle('win:minimize', (e) => {
   BrowserWindow.fromWebContents(e.sender)?.minimize()
 })
@@ -496,6 +559,16 @@ ipcMain.handle('win:fullscreenToggle', (e) => {
   if (!win) return
   if (win.isMaximized()) win.unmaximize()
   else win.maximize()
+})
+
+/* Set the theme*/
+ipcMain.handle('theme:set', (_evt, theme: ThemeSource) => {
+  if (typeof theme !== 'string') return currentThemePayload()
+  // Accept 'system' | 'light' | 'dark' | 'custom:<name>'
+  if (theme === 'system' || theme === 'light' || theme === 'dark' || theme.startsWith('custom:')) {
+    setAppTheme(theme)
+  }
+  return currentThemePayload()
 })
 
 /* ------------------ Explicit dialogs: Open File / Open Folder --------------- */
@@ -705,7 +778,8 @@ ipcMain.handle('win:openAbout', async () => {
     minimizable: false,
     maximizable: false,
     frame: false,
-    backgroundColor: '#0b0f14',
+    // backgroundColor: '#0b0f14',
+    backgroundColor: getWindowBg(),
     show: false,
     alwaysOnTop: true,
     webPreferences: {
