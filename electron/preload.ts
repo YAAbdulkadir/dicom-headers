@@ -1,6 +1,16 @@
 // electron/preload.ts
 import { contextBridge, IpcRenderer, ipcRenderer, IpcRendererEvent } from 'electron'
 
+// Theme types
+export type ThemeSource = 'system' | 'light' | 'dark' | `custom:${string}`
+export type ThemePayload = {
+  themeSource: ThemeSource
+  shouldUseDarkColors: boolean
+}
+
+// Theme IPC channel name (matches main.ts)
+const THEME_CHANNEL = 'theme:changed'
+
 /* ----------------------------- Shared types ----------------------------- */
 export type InstanceRef = {
   path: string
@@ -85,6 +95,12 @@ export type AppInfo = {
 
 /* ------------------------------ API contract ---------------------------- */
 export interface RendererApi {
+  // Theme
+  theme?: {
+    get: () => Promise<ThemePayload>
+    set: (theme: ThemeSource) => Promise<ThemePayload>
+    onDidChange: (cb: (payload: ThemePayload) => void) => () => void
+  }
   // Window
   winMinimize: () => Promise<void>
   winMaximize: () => Promise<void>
@@ -148,6 +164,16 @@ ipcRenderer.on('headers:add-tab', (_e, payload: SeriesOpenPayload) => {
 
 /* ----------------------------- Implementation --------------------------- */
 const api = {
+  // Theme
+  theme: {
+    get: () => ipcRenderer.invoke('theme:get') as Promise<ThemePayload>,
+    set: (theme: ThemeSource) => ipcRenderer.invoke('theme:set', theme) as Promise<ThemePayload>,
+    onDidChange: (cb: (payload: ThemePayload) => void) => {
+      const listener = (_e: IpcRendererEvent, payload: ThemePayload) => cb(payload)
+      ipcRenderer.on(THEME_CHANNEL, listener)
+      return () => ipcRenderer.off(THEME_CHANNEL, listener)
+    },
+  },
   // Window controls
   winMinimize: () => ipcRenderer.invoke('win:minimize'),
   winMaximize: () => ipcRenderer.invoke('win:maximize'),
