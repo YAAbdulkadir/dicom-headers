@@ -3,6 +3,10 @@ import React, { StrictMode, Suspense } from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import App from './App'
 
+// theme provider + base CSS
+import { ThemeProvider } from './theme/ThemeProvider'
+import './theme/base.css'
+
 // Lazy-load the headers window bundle
 const HeadersWindow = React.lazy(() => import('./HeadersWindow'))
 
@@ -20,15 +24,20 @@ function Router() {
 
   React.useEffect(() => {
     // console.log('[renderer:root] initial hash =', route)
-    const onHash = () => {
-      const h = getHash()
-      // console.log('[renderer:root] hashchange ->', h)
-      setRoute(h)
-    }
+    const onHash = () => setRoute(getHash())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  
+  // {
+  //     const h = getHash()
+  //     // console.log('[renderer:root] hashchange ->', h)
+  //     setRoute(h)
+  //   }
+  //   window.addEventListener('hashchange', onHash)
+  //   return () => window.removeEventListener('hashchange', onHash)
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [])
 
   if (route.startsWith('#/headers')) {
     // console.log('[renderer:root] rendering <HeadersWindow/>')
@@ -60,6 +69,9 @@ if (!window.__APP_ROOT__) {
 
 window.__APP_ROOT__.render(
   <StrictMode>
-    <Router />
+    {/* wrap everything so ALL routes/windows share the same theme */}
+    <ThemeProvider>
+      <Router />
+    </ThemeProvider>
   </StrictMode>
 )
