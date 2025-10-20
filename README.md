@@ -1,58 +1,96 @@
-# DICOM Headers
+# 🩻 DICOM Headers  
+*A fast, elegant Electron app to browse and inspect DICOM headers.*
 
- A fast, minimal Electron app to browse DICOM headers.
- Built with **vite + React + TypeScript + Electron** and **dicom-parser**.
+<div align="center">
 
- ## Install (prebuilt)
- Grab the latest release from **Github Releases** (see "Releasing" below):
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue?style=flat-square)
+![Electron](https://img.shields.io/badge/Built_with-Electron_38.3.0-47848F?style=flat-square&logo=electron)
+![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript_5.4-3178C6?style=flat-square&logo=typescript)
+![License](https://img.shields.io/badge/License-LGPL_3.0-green?style=flat-square)
+[![GitHub Releases](https://img.shields.io/github/v/release/YAAbdulkadir/dicom-headers?style=flat-square&color=orange)](https://github.com/YAAbdulkadir/dicom-headers/releases)
 
- - **Windows:** `DICOM Headers Setup X.Y.Z.exe` (NSIS installer) or `win-unpacked` portable folder
- - **Linux:** `AppImage` or `.deb`
+</div>
 
- ## Development
+---
 
- ```bash
- # 1) install deps
- npm i
+## 📸 Preview
 
- # 2) run renderer dev server
- npm run dev
+| Main Window | Header Viewer |
+|:-------------:|:---------------:|
+| ![Main Window](./assets/screenshots/main_window.png) | ![Headers Viewer](./assets/screenshots/headers_window.png) |
 
- # 3) run Electron (loads the dev server URL)
- npm run electron:dev
- ```
 
- ## Packaging locally
- ### Windows
- ```bash
- npm run build:renderer
- npm run build:electron
- npm run dist:win
- ```
+---
 
- Artifacts are written to release/:
- * **win-unpacked**/ - portable exe (no install)
- * **DICOM Headers Setup X.Y.Z.exe** - NSIS installer (recommended for end users)
+## 🚀 Overview
 
- ### Linux
- ```bash
- npm run build:renderer
- npm run build:electron
- npm run dist:linux
- ```
+**DICOM Headers** is a lightweight, cross-platform viewer for inspecting DICOM metadata.  
+It’s designed for researchers, developers, and medical physicists who need a **fast, minimal**, and **accurate** tool to explore `.dcm` and `.ima` files without launching a full-featured PACS.
 
- Artifacts:
- * ***.AppImage** - portable (recommended)
- * Optionally **.deb**, **.rpm** if configured
+Built using:
+- ⚡ **Electron** + **Vite** for blazing-fast startup
+- ⚛️ **React + TypeScript** for modular UI
+- 🧠 **dicom-parser** for reliable tag decoding
 
-## Usage
-1. Launch the app.
-2. Click Scan and choose a folder with DICOM files.
-3. In the Series list, choose **View Headers** to open a tabbed headers window.
-4. Click an instance to load its headers; expand sequences as needed.
+---
+
+## 📦 Installation
+
+### 🪟 **Windows**
+
+1. Visit the [**Releases**](https://github.com/YAAbdulkadir/dicom-headers/releases) page.  
+2. Download **`DICOM Headers Setup X.Y.Z.exe`**.  
+   - Double-click to install.  
+   - The app will appear in your **Start Menu**.  
+
+### 🐧 **Linux**
+
+#### 🧊 Option 1 — AppImage (recommended)
+Works on most distributions (Ubuntu, Fedora, Arch, Pop!_OS, etc.)
+
+```bash
+chmod +x "DICOM Headers-0.2.4.AppImage"
+./"DICOM Headers-0.2.4.AppImage"
+```
+To integrate into your application menu:
+
+```bash
+./"DICOM Headers-0.2.4.AppImage" --appimage-extract
+./squashfs-root/AppRun
+```
+
+#### 📦 Option 2 — Debian / Ubuntu (.deb)
+```bash
+sudo dpkg -i dicom-headers_0.2.4_amd64.deb
+sudo apt --fix-broken install  # if needed
+dicom-headers
+```
+
+#### 🧱 Option 3 — Fedora / RHEL / openSUSE (.rpm)
+```bash
+sudo dnf install -y ./dicom-headers-0.2.4.x86_64.rpm
+dicom-headers
+
+```
+#### 📄 Available Artifacts
+| File                             | Description                             |
+| -------------------------------- | --------------------------------------- |
+| `DICOM Headers-X.Y.Z.AppImage`   | Portable all-in-one build (recommended) |
+| `dicom-headers_X.Y.Z_amd64.deb`  | Debian / Ubuntu package                 |
+| `dicom-headers-X.Y.Z.x86_64.rpm` | Fedora / RHEL / openSUSE package        |
+
+#### 🔄 Auto-Updates
+If you include latest.yml (Windows) or latest-linux.yml (Linux) from the GitHub release,
+DICOM Headers will automatically check for updates when launched (via electron-updater).
 
 ## License
 This project is licensed under the LGPL 3.0 License. See the [LICENSE](LICENSE) file for details
 
 ## Contacts
-If you have any questions or suggestions, please contact me at YasinAAbdulkadir@gmail.com
+**Author:** [Yasin Abdulkadir](mailto:YasinAAbdulkadir@gmail.com)
+
+**GitHub:** [@YAAbdulkadir](https://github.com/YAAbdulkadir)
+
+If you have any questions, suggestions, or bug reports, please reach out or open an issue on the repository.
+
