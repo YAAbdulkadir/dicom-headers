@@ -13,11 +13,19 @@
     "productName": "DICOM Headers",
     "fileAssociations": [
       {
-        "ext": [
-          "dcm",
-          "dicom",
-          "ima"
-        ],
+        "ext": "dcm",
+        "name": "DICOM file",
+        "mimeType": "application/dicom",
+        "role": "Viewer"
+      },
+      {
+        "ext": "dicom",
+        "name": "DICOM file",
+        "mimeType": "application/dicom",
+        "role": "Viewer"
+      },
+      {
+        "ext": "ima",
         "name": "DICOM file",
         "mimeType": "application/dicom",
         "role": "Viewer"
