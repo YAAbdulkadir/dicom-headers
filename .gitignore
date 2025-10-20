@@ -10,7 +10,6 @@ yarn.lock
 
 # Build output
 dist/
-build/
 out/
 release/*
 coverage/
