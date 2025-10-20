@@ -18,7 +18,7 @@
 
 | Main Window | Header Viewer |
 |:-------------:|:---------------:|
-| ![Main Window](./assets/screenshots/main_window.png) | ![Headers Viewer](./assets/screenshots/headers_window.png) |
+| ![Main Window](https://raw.githubusercontent.com/YAAbdulkadir/dicom-headers/refs/heads/main/assets/screenshots/headers_window.png) | ![Headers Viewer](https://raw.githubusercontent.com/YAAbdulkadir/dicom-headers/refs/heads/main/assets/screenshots/headers_window.png) |
 
 
 ---
