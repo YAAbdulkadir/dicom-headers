@@ -3,7 +3,8 @@
   "version": "0.2.4",
   "description": "An app to view DICOM headers",
   "author": {
-    "name": "Yasin Abdulkadir"
+    "name": "Yasin Abdulkadir",
+    "email": "yasinaabdulkadir@gmail.com"
   },
   "homepage": "https://github.com/YAAbdulkadir/dicom-headers",
   "private": true,
